@@ -160,7 +160,15 @@ class DockerComposeSection:
             try:
                 containers = await _ps(compose_path)
             except Exception as e:
-                warnings.append(f"docker {compose_path}: {e}")
+                # short message for the alerts block — full error in the daemon logs
+                msg = str(e).splitlines()[0]
+                if "permission denied" in msg.lower():
+                    short = "permission denied"
+                elif len(msg) > 80:
+                    short = msg[:77] + "..."
+                else:
+                    short = msg
+                warnings.append(f"docker {project_default}: {short}")
                 continue
             seen: set[str] = set()
             for c in containers:
