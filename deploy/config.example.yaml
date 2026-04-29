@@ -1,0 +1,92 @@
+notifiers:
+  - type: telegram
+    bot_token: "REPLACE_ME"
+    chat_id: "REPLACE_ME"
+    lang: ru                 # ru | en — язык всех сообщений в TG
+
+# Реактивные алерты: чек крутится каждый interval, шлёт в TG только на
+# переходах:  ok->warn(🟡)  ok/warn->crit(🔴)  любой->ok(🟢 resolved).
+# Не спамит пока уровень не меняется.
+checks:
+  - type: cpu
+    name: cpu
+    interval: 60
+    warn_pct: 80              # 🟡 при >= 80%
+    crit_pct: 90              # 🔴 при >= 90%
+  - type: memory
+    name: memory
+    interval: 60
+    warn_pct: 80
+    crit_pct: 90
+  - type: disk
+    name: disk-root
+    interval: 60
+    path: /
+    warn_pct: 80
+    crit_pct: 90
+  # systemd-юниты — алерт если is-active != active
+  # - type: systemd
+  #   name: systemd-nginx
+  #   interval: 60
+  #   unit: nginx.service
+
+# Периодический полный дайджест
+report:
+  interval: 2700               # 45 минут
+  hostname: my-server
+  notifier: telegram
+
+  host:
+    memory: {}
+    swap: {}
+    cpu: {}
+    disks:
+      paths: ["/"]
+    net:
+      interfaces: [eth0]   # либо `net: true` чтобы суммировать все интерфейсы
+
+  # Список compose-файлов и контейнеров для мониторинга.
+  # `containers` — какие имена сервисов показывать (если пусто — все).
+  # `starred` — какие пометить ⭐️.
+  docker:
+    - compose: /opt/goda/docker-compose.yaml
+      containers: [goda-platform, goda-engine, goda-db, goda-redis]
+      starred: [goda-platform, goda-engine]
+    - compose: /opt/tanos/docker-compose.yaml
+      containers: [tanos-web, tanos-db]
+
+# Стрим логов: первое появление каждой уникальной ошибки летит сразу,
+# повторы копятся и шлются дайджестом раз в digest_interval. Файл с логами
+# пишется в storage.path и ротируется при превышении max_size_mb.
+logs:
+  notifier: telegram
+  digest_interval: 3600        # сек, раз в час
+  storage:
+    path: logs/blackbox.jsonl  # путь относительно WorkingDirectory
+    max_size_mb: 10            # ротация когда файл превышает этот размер
+    keep_archives: 7           # сколько .jsonl.gz архивов хранить
+  sources:
+    - type: file
+      name: nginx-error
+      path: /var/log/nginx/error.log
+      pattern: ".+"
+    - type: docker
+      name: goda-app
+      compose: /opt/goda/docker-compose.yaml
+      service: goda-platform
+      pattern: "ERROR|CRITICAL|Traceback"
+    - type: journal
+      name: nginx-systemd
+      unit: nginx.service
+      pattern: "(?i)error|warn"
+
+  # postgres / dlq — закомментировано, раскомментируй если нужно
+
+  #   - dsn: "postgresql://user:pass@localhost/goda"
+  #     label: "Goda DB"
+  #     warn_conns: 50
+  # dlq:
+  #   - dsn: "postgresql://user:pass@localhost/goda"
+  #     query: "SELECT count(*) FROM dlq_messages"
+  #     label: "Goda DLQ"
+  #     warn_above: 1
