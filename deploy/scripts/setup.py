@@ -909,6 +909,11 @@ def uninstall_systemd() -> int:
 
 
 def build_unit(*, user: str, group: str, venv_py: Path) -> str:
+    # Hardening flags (ProtectSystem/ProtectHome/PrivateTmp/ReadWritePaths) were
+    # dropped intentionally: they create a private mount namespace, which breaks
+    # control-panel setups where /var/www/<user>/ is a bind mount or has
+    # restricted parent directories that get hidden inside the namespace
+    # (docker compose then fails to stat .env files even as root).
     return f"""[Unit]
 Description=BlackBox monitoring daemon
 After=network-online.target
@@ -922,12 +927,6 @@ WorkingDirectory={PROJECT_ROOT}
 ExecStart={venv_py} -m src.main {CONFIG_FILE}
 Restart=on-failure
 RestartSec=5s
-
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=read-only
-PrivateTmp=yes
-ReadWritePaths={PROJECT_ROOT}
 
 [Install]
 WantedBy=multi-user.target
