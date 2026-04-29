@@ -16,7 +16,10 @@ cat > "$CLI" <<EOF
 # Edit /home/.../Blackbox/Makefile for behavior changes; this is just dispatch.
 PROJECT_ROOT="$PROJECT_ROOT"
 
-case "\${1:-setup}" in
+ACTION="\${1:-setup}"
+[ \$# -gt 0 ] && shift
+
+case "\$ACTION" in
     -h|--help|help)
         cat <<USAGE
 Usage: blackbox [command]
@@ -38,11 +41,10 @@ USAGE
         echo "\$PROJECT_ROOT"
         ;;
     setup|run|start|stop|restart|status|logs|install-service|uninstall-service|clean|install)
-        ACTION="\$1"; shift || true
         exec make -C "\$PROJECT_ROOT" "\$ACTION" "\$@"
         ;;
     *)
-        echo "blackbox: unknown command '\$1'" >&2
+        echo "blackbox: unknown command '\$ACTION'" >&2
         echo "run 'blackbox help' for usage" >&2
         exit 1
         ;;
