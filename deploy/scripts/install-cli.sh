@@ -5,7 +5,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-BIN_DIR="${HOME}/.local/bin"
+# root → /usr/local/bin (always on PATH), regular user → ~/.local/bin.
+# Override either with: BLACKBOX_BIN_DIR=/some/path make install-cli
+if [ -n "${BLACKBOX_BIN_DIR:-}" ]; then
+    BIN_DIR="$BLACKBOX_BIN_DIR"
+elif [ "$(id -u)" -eq 0 ]; then
+    BIN_DIR="/usr/local/bin"
+else
+    BIN_DIR="${HOME}/.local/bin"
+fi
 mkdir -p "$BIN_DIR"
 
 CLI="$BIN_DIR/blackbox"
