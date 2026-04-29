@@ -13,6 +13,7 @@ from pathlib import Path
 
 import psutil
 import questionary
+import yaml
 from rich.align import Align
 from rich.console import Console, Group
 from rich.live import Live
@@ -56,6 +57,9 @@ LOCALES: dict[str, dict[str, str]] = {
         "ask_proxy_port": "  proxy port",
         "ask_proxy_user": "  proxy user (empty if none)",
         "ask_proxy_pass": "  proxy password (empty if none)",
+        "have_tg_creds": "found existing Telegram setup: chat_id={chat_id}{proxy}",
+        "ask_keep_tg_creds": "keep current bot token and chat id?",
+        "ask_keep_proxy": "keep current proxy ({proxy})?",
         "ask_hostname": "hostname",
         "ask_report_int": "report interval (sec)",
         "ask_warn": "warn threshold %",
@@ -133,6 +137,9 @@ LOCALES: dict[str, dict[str, str]] = {
         "ask_proxy_port": "  порт прокси",
         "ask_proxy_user": "  юзер прокси (пусто если без авторизации)",
         "ask_proxy_pass": "  пароль прокси (пусто если без авторизации)",
+        "have_tg_creds": "найдены данные Telegram: chat_id={chat_id}{proxy}",
+        "ask_keep_tg_creds": "оставить текущий токен и chat id?",
+        "ask_keep_proxy": "оставить текущий прокси ({proxy})?",
         "ask_hostname": "hostname",
         "ask_report_int": "интервал репорта (сек)",
         "ask_warn": "warn порог %",
@@ -232,6 +239,73 @@ def warn_line(msg: str) -> None:
     console.print(f"  [yellow]![/yellow] {msg}")
 
 
+# ── existing config helpers ─────────────────────────────────────────────────
+
+def _load_existing_telegram() -> dict | None:
+    if not CONFIG_FILE.exists():
+        return None
+    try:
+        raw = yaml.safe_load(CONFIG_FILE.read_text()) or {}
+    except Exception:
+        return None
+    for n in raw.get("notifiers") or []:
+        if n.get("type") == "telegram" and n.get("bot_token") and n.get("chat_id"):
+            return n
+    return None
+
+
+def _mask_proxy(url: str) -> str:
+    """socks5h://user:pass@host:port -> socks5h://user:***@host:port"""
+    import re as _re
+    return _re.sub(r"(://[^:@/]+):[^@]*(@)", r"\1:***\2", url) or url
+
+
+def _ask_proxy() -> str:
+    p_host = Prompt.ask(t("ask_proxy_host"))
+    p_port = Prompt.ask(t("ask_proxy_port"), default="1080")
+    p_user = Prompt.ask(t("ask_proxy_user"), default="", show_default=False)
+    p_pass = ""
+    if p_user:
+        p_pass = Prompt.ask(t("ask_proxy_pass"), default="", show_default=False, password=True)
+    if p_user:
+        return f"socks5h://{p_user}:{p_pass}@{p_host}:{p_port}"
+    return f"socks5h://{p_host}:{p_port}"
+
+
+def _gather_telegram() -> tuple[str, str, str]:
+    """Returns (bot_token, chat_id, proxy_url). Reuses existing values if user opts in."""
+    existing = _load_existing_telegram()
+
+    if existing:
+        proxy_existing = existing.get("proxy") or ""
+        proxy_hint = " + proxy" if proxy_existing else ""
+        console.print(f"  [dim italic]{t('have_tg_creds', chat_id=existing['chat_id'], proxy=proxy_hint)}[/dim italic]")
+
+        if Confirm.ask(f"  {t('ask_keep_tg_creds')}", default=True):
+            bot_token = existing["bot_token"]
+            chat_id = str(existing["chat_id"])
+
+            if proxy_existing:
+                masked = _mask_proxy(proxy_existing)
+                if Confirm.ask(f"  {t('ask_keep_proxy', proxy=masked)}", default=True):
+                    return bot_token, chat_id, proxy_existing
+                # User wants to change/remove proxy
+                if Confirm.ask(f"  {t('ask_proxy_yn')}", default=False):
+                    return bot_token, chat_id, _ask_proxy()
+                return bot_token, chat_id, ""
+
+            # No existing proxy — offer to add one
+            if Confirm.ask(f"  {t('ask_proxy_yn')}", default=False):
+                return bot_token, chat_id, _ask_proxy()
+            return bot_token, chat_id, ""
+
+    # Fresh setup or user declined to reuse
+    bot_token = Prompt.ask(f"  [bold]{t('ask_bot_token')}[/bold]", password=True)
+    chat_id = Prompt.ask(f"  [bold]{t('ask_chat_id')}[/bold]")
+    proxy_url = _ask_proxy() if Confirm.ask(f"  {t('ask_proxy_yn')}", default=False) else ""
+    return bot_token, chat_id, proxy_url
+
+
 # ── language ────────────────────────────────────────────────────────────────
 
 def pick_language() -> None:
@@ -279,21 +353,7 @@ def main_menu() -> str:
 
 def run_wizard() -> None:
     section(t("section_tg"))
-    bot_token = Prompt.ask(f"  [bold]{t('ask_bot_token')}[/bold]", password=True)
-    chat_id = Prompt.ask(f"  [bold]{t('ask_chat_id')}[/bold]")
-
-    proxy_url = ""
-    if Confirm.ask(f"  {t('ask_proxy_yn')}", default=False):
-        p_host = Prompt.ask(t("ask_proxy_host"))
-        p_port = Prompt.ask(t("ask_proxy_port"), default="1080")
-        p_user = Prompt.ask(t("ask_proxy_user"), default="", show_default=False)
-        p_pass = Prompt.ask(
-            t("ask_proxy_pass"), default="", show_default=False, password=bool(p_user),
-        ) if p_user else ""
-        if p_user:
-            proxy_url = f"socks5h://{p_user}:{p_pass}@{p_host}:{p_port}"
-        else:
-            proxy_url = f"socks5h://{p_host}:{p_port}"
+    bot_token, chat_id, proxy_url = _gather_telegram()
 
     section(t("section_host"))
     hostname = Prompt.ask(f"  {t('ask_hostname')}", default=socket.gethostname())
