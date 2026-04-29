@@ -51,6 +51,11 @@ LOCALES: dict[str, dict[str, str]] = {
         "section_service": "Systemd service",
         "ask_bot_token": "bot token",
         "ask_chat_id": "chat id",
+        "ask_proxy_yn": "use SOCKS5 proxy for Telegram?",
+        "ask_proxy_host": "  proxy host",
+        "ask_proxy_port": "  proxy port",
+        "ask_proxy_user": "  proxy user (empty if none)",
+        "ask_proxy_pass": "  proxy password (empty if none)",
         "ask_hostname": "hostname",
         "ask_report_int": "report interval (sec)",
         "ask_warn": "warn threshold %",
@@ -123,6 +128,11 @@ LOCALES: dict[str, dict[str, str]] = {
         "section_service": "Systemd-сервис",
         "ask_bot_token": "токен бота",
         "ask_chat_id": "chat id",
+        "ask_proxy_yn": "использовать SOCKS5-прокси для Telegram?",
+        "ask_proxy_host": "  хост прокси",
+        "ask_proxy_port": "  порт прокси",
+        "ask_proxy_user": "  юзер прокси (пусто если без авторизации)",
+        "ask_proxy_pass": "  пароль прокси (пусто если без авторизации)",
         "ask_hostname": "hostname",
         "ask_report_int": "интервал репорта (сек)",
         "ask_warn": "warn порог %",
@@ -272,6 +282,19 @@ def run_wizard() -> None:
     bot_token = Prompt.ask(f"  [bold]{t('ask_bot_token')}[/bold]", password=True)
     chat_id = Prompt.ask(f"  [bold]{t('ask_chat_id')}[/bold]")
 
+    proxy_url = ""
+    if Confirm.ask(f"  {t('ask_proxy_yn')}", default=False):
+        p_host = Prompt.ask(t("ask_proxy_host"))
+        p_port = Prompt.ask(t("ask_proxy_port"), default="1080")
+        p_user = Prompt.ask(t("ask_proxy_user"), default="", show_default=False)
+        p_pass = Prompt.ask(
+            t("ask_proxy_pass"), default="", show_default=False, password=bool(p_user),
+        ) if p_user else ""
+        if p_user:
+            proxy_url = f"socks5h://{p_user}:{p_pass}@{p_host}:{p_port}"
+        else:
+            proxy_url = f"socks5h://{p_host}:{p_port}"
+
     section(t("section_host"))
     hostname = Prompt.ask(f"  {t('ask_hostname')}", default=socket.gethostname())
     report_int = Prompt.ask(f"  {t('ask_report_int')}", default="2700")
@@ -295,7 +318,7 @@ def run_wizard() -> None:
         systemd_units = configure_systemd()
 
     yaml_text = build_yaml(
-        bot_token=bot_token, chat_id=chat_id,
+        bot_token=bot_token, chat_id=chat_id, proxy=proxy_url,
         hostname=hostname, report_interval=int(report_int),
         warn_pct=int(warn_pct), crit_pct=int(crit_pct),
         disks=disks, docker_blocks=docker_blocks,
@@ -626,6 +649,7 @@ def build_yaml(
     *,
     bot_token: str,
     chat_id: str,
+    proxy: str = "",
     hostname: str,
     report_interval: int,
     warn_pct: int,
@@ -638,13 +662,14 @@ def build_yaml(
 ) -> str:
     systemd_units = systemd_units or []
     parts: list[str] = []
+    proxy_line = f'    proxy: "{proxy}"\n' if proxy else ""
     parts.append(f"""\
 notifiers:
   - type: telegram
     bot_token: "{bot_token}"
     chat_id: "{chat_id}"
     lang: {notifier_lang}
-
+{proxy_line}
 checks:
   - type: cpu
     name: cpu

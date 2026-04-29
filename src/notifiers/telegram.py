@@ -108,10 +108,17 @@ def _trunc(s: str, n: int) -> str:
 
 
 class TelegramNotifier:
-    def __init__(self, bot_token: str, chat_id: str | int, lang: str = "en") -> None:
+    def __init__(
+        self,
+        bot_token: str,
+        chat_id: str | int,
+        lang: str = "en",
+        proxy: str | None = None,
+    ) -> None:
         self.url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         self.chat_id = chat_id
         self.lang = lang if lang in _TITLES else "en"
+        self.proxy = proxy or None
 
     async def send(self, alert: Alert) -> None:
         icon = _LEVEL_ICON.get(alert.level, "⚠️")
@@ -170,7 +177,10 @@ class TelegramNotifier:
         return _esc(alert.detail)
 
     async def _send(self, text: str) -> None:
-        async with httpx.AsyncClient(timeout=10) as client:
+        kwargs: dict = {"timeout": 10}
+        if self.proxy:
+            kwargs["proxy"] = self.proxy
+        async with httpx.AsyncClient(**kwargs) as client:
             response = await client.post(
                 self.url,
                 json={

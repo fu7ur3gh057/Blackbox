@@ -3,6 +3,9 @@ notifiers:
     bot_token: "REPLACE_ME"
     chat_id: "REPLACE_ME"
     lang: ru                 # ru | en — language of all Telegram messages
+    # SOCKS5 proxy for Telegram (use if api.telegram.org is unreachable directly).
+    # Format: socks5h://user:pass@host:port  or  socks5h://host:port (no auth)
+    # proxy: "socks5h://user:pass@proxy.example.com:1080"
 
 # Reactive alerts: each check runs on its interval, sends to TG only on
 # transitions: ok->warn(🟡), ok/warn->crit(🔴), any->ok(🟢 resolved).

@@ -11,16 +11,21 @@ class HttpCheck:
         url: str,
         timeout: float = 10.0,
         expect_status: int = 200,
+        proxy: str | None = None,
     ) -> None:
         self.name = name
         self.interval = interval
         self.url = url
         self.timeout = timeout
         self.expect_status = expect_status
+        self.proxy = proxy or None
 
     async def run(self) -> Result:
+        kwargs: dict = {"timeout": self.timeout}
+        if self.proxy:
+            kwargs["proxy"] = self.proxy
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(**kwargs) as client:
                 response = await client.get(self.url)
         except Exception as e:
             return Result(
