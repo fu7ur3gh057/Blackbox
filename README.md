@@ -26,10 +26,27 @@ No agents, no databases, no service mesh.
 
 ## Requirements
 
-- Linux, Python 3.10+
+- Linux
+- **Python 3.10+** (the wizard refuses to run on older versions)
 - `make`, `bash`
 - Optional: `docker compose` v2 (for Docker monitoring), `systemctl` (for
   systemd checks), `journalctl` (for journal log streaming)
+
+If your distro ships only Python 3.8 / 3.9 (e.g. Ubuntu 20.04), install a
+newer interpreter first:
+
+```bash
+# Ubuntu 22.04+:
+sudo apt install -y python3.11 python3.11-venv
+
+# Older systems (Ubuntu 18.04 / 20.04):
+sudo add-apt-repository -y ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install -y python3.11 python3.11-venv
+```
+
+The bootstrap auto-picks the highest available 3.10+ interpreter
+(`python3.13` → `python3.10`).
 
 ## Quick start
 

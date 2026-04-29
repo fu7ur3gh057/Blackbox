@@ -22,9 +22,7 @@ help:
 	@echo "  make clean              убрать venv и __pycache__"
 
 $(VENV):
-	$(PYTHON) -m venv $(VENV)
-	$(PIP) install -q --upgrade pip
-	$(PIP) install -q -r requirements.txt
+	@bash -c '. deploy/scripts/_bootstrap.sh && ensure_venv "$$PWD"'
 
 install: $(VENV)
 
