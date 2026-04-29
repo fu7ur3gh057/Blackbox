@@ -676,14 +676,10 @@ checks:
 """)
     paths_yaml = ", ".join(f'"{d}"' for d in disks) or '"/"'
 
-    if net_cfg is False:
-        net_yaml = ""
-    elif net_cfg is True:
-        net_yaml = "    net: true\n"
-    elif isinstance(net_cfg, dict) and net_cfg.get("interfaces"):
-        net_yaml = f"    net:\n      interfaces: [{', '.join(net_cfg['interfaces'])}]\n"
+    if isinstance(net_cfg, dict) and net_cfg.get("interfaces"):
+        ifaces_yaml = f"    interfaces: [{', '.join(net_cfg['interfaces'])}]\n"
     else:
-        net_yaml = "    net: true\n"
+        ifaces_yaml = ""
 
     parts.append(f"""
 report:
@@ -692,12 +688,9 @@ report:
   notifier: telegram
 
   host:
-    memory: {{}}
-    swap: {{}}
-    cpu: {{}}
-    disks:
-      paths: [{paths_yaml}]
-{net_yaml}""")
+    disks: [{paths_yaml}]
+{ifaces_yaml}    warn_pct: {warn_pct}
+""")
     if docker_blocks:
         parts.append("\n  docker:\n")
         for b in docker_blocks:

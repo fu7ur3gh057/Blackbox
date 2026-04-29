@@ -38,7 +38,10 @@ async def _run(config: Config) -> None:
     if config.report:
         from .report import build_report_runner
 
-        report_runner = build_report_runner(config.report, notifiers_by_type)
+        logs_path = ((config.logs or {}).get("storage") or {}).get("path")
+        report_runner = build_report_runner(
+            config.report, notifiers_by_type, logs_storage_path=logs_path,
+        )
         if report_runner is not None:
             tasks.append(report_runner.run())
 

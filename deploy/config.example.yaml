@@ -37,13 +37,13 @@ report:
   notifier: telegram
 
   host:
-    memory: {}
-    swap: {}
-    cpu: {}
-    disks:
-      paths: ["/"]
-    net:
-      interfaces: [eth0]   # либо `net: true` чтобы суммировать все интерфейсы
+    disks: ["/"]
+    interfaces: [eth0]     # пропустить чтобы суммировать все интерфейсы
+    warn_pct: 80           # пороги для иконок и рекомендаций
+
+  recent_errors:
+    limit: 5               # сколько последних уникальных ошибок показывать
+    # по умолчанию читает logs.storage.path, отключить можно: recent_errors: false
 
   # Список compose-файлов и контейнеров для мониторинга.
   # `containers` — какие имена сервисов показывать (если пусто — все).
