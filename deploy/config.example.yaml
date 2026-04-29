@@ -2,17 +2,17 @@ notifiers:
   - type: telegram
     bot_token: "REPLACE_ME"
     chat_id: "REPLACE_ME"
-    lang: ru                 # ru | en — язык всех сообщений в TG
+    lang: ru                 # ru | en — language of all Telegram messages
 
-# Реактивные алерты: чек крутится каждый interval, шлёт в TG только на
-# переходах:  ok->warn(🟡)  ok/warn->crit(🔴)  любой->ok(🟢 resolved).
-# Не спамит пока уровень не меняется.
+# Reactive alerts: each check runs on its interval, sends to TG only on
+# transitions: ok->warn(🟡), ok/warn->crit(🔴), any->ok(🟢 resolved).
+# Stays quiet while the level doesn't change.
 checks:
   - type: cpu
     name: cpu
     interval: 60
-    warn_pct: 80              # 🟡 при >= 80%
-    crit_pct: 90              # 🔴 при >= 90%
+    warn_pct: 80              # 🟡 above this
+    crit_pct: 90              # 🔴 above this
   - type: memory
     name: memory
     interval: 60
@@ -24,30 +24,30 @@ checks:
     path: /
     warn_pct: 80
     crit_pct: 90
-  # systemd-юниты — алерт если is-active != active
+  # systemd units — alerts if is-active != active
   # - type: systemd
   #   name: systemd-nginx
   #   interval: 60
   #   unit: nginx.service
 
-# Периодический полный дайджест
+# Periodic full status digest
 report:
-  interval: 2700               # 45 минут
+  interval: 2700               # 45 minutes
   hostname: my-server
   notifier: telegram
 
   host:
     disks: ["/"]
-    interfaces: [eth0]     # пропустить чтобы суммировать все интерфейсы
-    warn_pct: 80           # пороги для иконок и рекомендаций
+    interfaces: [eth0]     # omit to sum across all interfaces
+    warn_pct: 80           # thresholds for icons and recommendations
 
   recent_errors:
-    limit: 5               # сколько последних уникальных ошибок показывать
-    # по умолчанию читает logs.storage.path, отключить можно: recent_errors: false
+    limit: 5               # how many recent unique errors to show
+    # By default reads logs.storage.path; disable with: recent_errors: false
 
-  # Список compose-файлов и контейнеров для мониторинга.
-  # `containers` — какие имена сервисов показывать (если пусто — все).
-  # `starred` — какие пометить ⭐️.
+  # List of compose files and containers to monitor.
+  # `containers` — which service names to show (empty = all).
+  # `starred` — which to highlight with ⭐️.
   docker:
     - compose: /opt/goda/docker-compose.yaml
       containers: [goda-platform, goda-engine, goda-db, goda-redis]
@@ -55,16 +55,16 @@ report:
     - compose: /opt/tanos/docker-compose.yaml
       containers: [tanos-web, tanos-db]
 
-# Стрим логов: первое появление каждой уникальной ошибки летит сразу,
-# повторы копятся и шлются дайджестом раз в digest_interval. Файл с логами
-# пишется в storage.path и ротируется при превышении max_size_mb.
+# Log streaming: each unique error fires once immediately, repeats are
+# collected and sent as a digest every digest_interval. The file is written
+# to storage.path and rotated when it exceeds max_size_mb.
 logs:
   notifier: telegram
-  digest_interval: 3600        # сек, раз в час
+  digest_interval: 3600        # seconds, every hour
   storage:
-    path: logs/blackbox.jsonl  # путь относительно WorkingDirectory
-    max_size_mb: 10            # ротация когда файл превышает этот размер
-    keep_archives: 7           # сколько .jsonl.gz архивов хранить
+    path: logs/blackbox.jsonl  # path relative to WorkingDirectory
+    max_size_mb: 10            # rotate when current file exceeds this
+    keep_archives: 7           # how many .jsonl.gz archives to keep
   sources:
     - type: file
       name: nginx-error
@@ -80,8 +80,8 @@ logs:
       unit: nginx.service
       pattern: "(?i)error|warn"
 
-  # postgres / dlq — закомментировано, раскомментируй если нужно
-
+  # postgres / dlq — commented out, uncomment if needed
+  # postgres:
   #   - dsn: "postgresql://user:pass@localhost/goda"
   #     label: "Goda DB"
   #     warn_conns: 50

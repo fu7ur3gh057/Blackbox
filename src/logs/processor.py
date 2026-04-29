@@ -16,7 +16,7 @@ _QUOTED_RE = re.compile(r"['\"][^'\"]{0,80}['\"]")
 
 
 def _signature(line: str) -> str:
-    """Stable hash of normalized first line — collapses similar errors."""
+    """Stable hash of the normalized first line — collapses similar errors."""
     head = line.splitlines()[0] if line else ""
     norm = _HEX_RE.sub("X", head)
     norm = _NUM_RE.sub("N", norm)
@@ -25,7 +25,7 @@ def _signature(line: str) -> str:
 
 
 class LogProcessor:
-    """Reads sources, dedups by signature, sends first-seen + periodic digest."""
+    """Reads sources, dedups by signature, sends first-seen and periodic digest."""
 
     def __init__(
         self,

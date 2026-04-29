@@ -6,7 +6,7 @@ from typing import Protocol
 class Result:
     level: str  # "ok" | "warn" | "crit"
     detail: str = ""
-    kind: str = ""              # "cpu" | "memory" | "disk" | "http" — for templates
+    kind: str = ""              # "cpu" | "memory" | "disk" | "http" — used for templates
     metrics: dict = field(default_factory=dict)
 
 

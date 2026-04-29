@@ -47,7 +47,7 @@ install-cli:
 uninstall-cli:
 	@rm -f $(HOME)/.local/bin/blackbox && echo "removed: $(HOME)/.local/bin/blackbox"
 
-# start/stop/restart graceful — проверяем что юнит установлен
+# Graceful start/stop/restart — check unit exists first
 start:
 	@if [ -f $(UNIT_PATH) ]; then sudo systemctl start $(SERVICE); else echo "$(SERVICE).service не установлен — запусти 'make install-service'"; fi
 stop:

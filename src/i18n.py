@@ -1,4 +1,4 @@
-"""Locale-aware date / uptime formatting for outgoing notifications."""
+"""Locale-aware date and uptime formatting for outgoing notifications."""
 import time
 
 _MONTHS = {

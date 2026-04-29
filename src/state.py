@@ -1,5 +1,5 @@
 class StateTracker:
-    """Tracks last-known severity per check; fires only on upgrade or recovery."""
+    """Tracks last severity per check; fires only on level upgrade or recovery."""
 
     _SEVERITY = {"ok": 0, "warn": 1, "crit": 2}
 
