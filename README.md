@@ -39,6 +39,21 @@ cd Blackbox
 make setup
 ```
 
+After the wizard, install a global `blackbox` command so you can run it from
+anywhere:
+
+```bash
+make install-cli      # one-time, drops a shim into ~/.local/bin/blackbox
+blackbox              # opens the wizard from any cwd
+blackbox run          # foreground
+blackbox status       # systemctl status
+blackbox cd           # prints project root (use: cd $(blackbox cd))
+blackbox help         # all commands
+```
+
+(`make install-cli` doesn't relocate the project — the shim points at wherever
+you cloned it. Move the project and re-run `make install-cli` to update.)
+
 The wizard walks you through:
 
 1. UI language (English / Russian)
@@ -65,6 +80,8 @@ make run                  # foreground, useful for first-run debugging
 make install-service      # write /etc/systemd/system/blackbox.service, enable, start
 make start | stop | restart | status | logs   # systemctl shortcuts
 make uninstall-service    # full removal
+make install-cli          # global `blackbox` command in ~/.local/bin
+make uninstall-cli        # remove the global command
 make clean                # drop venv and __pycache__
 ```
 

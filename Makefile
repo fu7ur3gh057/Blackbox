@@ -7,7 +7,7 @@ CONFIG := config.yaml
 SERVICE := blackbox
 UNIT_PATH := /etc/systemd/system/$(SERVICE).service
 
-.PHONY: help setup install run install-service uninstall-service start stop restart status logs clean
+.PHONY: help setup install run install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
 
 help:
 	@echo "BlackBox — targets:"
@@ -16,6 +16,8 @@ help:
 	@echo "  make run                запустить в foreground (нужен $(CONFIG))"
 	@echo "  make install-service    поставить systemd-юнит (sudo)"
 	@echo "  make uninstall-service  остановить и удалить systemd-юнит (sudo)"
+	@echo "  make install-cli        поставить глобальную команду 'blackbox' в ~/.local/bin"
+	@echo "  make uninstall-cli      удалить глобальную команду"
 	@echo "  make start | stop | restart | status | logs"
 	@echo "  make clean              убрать venv и __pycache__"
 
@@ -38,6 +40,12 @@ install-service:
 
 uninstall-service:
 	@bash deploy/scripts/uninstall-service.sh
+
+install-cli:
+	@bash deploy/scripts/install-cli.sh
+
+uninstall-cli:
+	@rm -f $(HOME)/.local/bin/blackbox && echo "removed: $(HOME)/.local/bin/blackbox"
 
 # start/stop/restart graceful — проверяем что юнит установлен
 start:
