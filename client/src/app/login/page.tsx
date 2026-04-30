@@ -34,7 +34,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="canvas w-full max-w-sm p-8">
+      <div className="panel w-full max-w-sm p-8">
         <div className="flex items-baseline gap-3 mb-8">
           <span className="text-2xl font-semibold tracking-tight text-ink-strong">
             black<span className="text-accent-lavender">box</span>

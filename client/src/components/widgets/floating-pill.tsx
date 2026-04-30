@@ -13,9 +13,8 @@ function formatUptime(secs: number): string {
 }
 
 /**
- * Bottom-right pill on the cream surround, mirroring the "+278k" badge
- * on the reference. We surface uptime — the kind of number you want
- * permanently visible on a monitoring tool.
+ * Floating accent pill, bottom-right of the viewport. Uptime is the
+ * one number worth seeing on every page without an extra click.
  */
 export function FloatingPill() {
   const { data } = useQuery({
@@ -29,12 +28,12 @@ export function FloatingPill() {
   return (
     <div className="fixed bottom-7 right-7 z-30 pointer-events-none">
       <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-accent-lavender pl-3 pr-4 py-2 shadow-chip">
-        <div className="h-7 w-7 rounded-full bg-canvas/80 flex items-center justify-center">
-          <ArrowUpRight size={14} className="text-accent-lavender" strokeWidth={2.5} />
+        <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
+          <ArrowUpRight size={14} className="text-white" strokeWidth={2.5} />
         </div>
         <div className="leading-tight">
-          <div className="text-[10px] uppercase tracking-wider text-canvas/70 font-medium">uptime</div>
-          <div className="text-[15px] font-bold text-canvas tabular-nums">
+          <div className="text-[10px] uppercase tracking-wider text-black/60 font-medium">uptime</div>
+          <div className="text-[15px] font-bold text-black tabular-nums">
             {formatUptime(data.uptime_seconds)}
           </div>
         </div>
