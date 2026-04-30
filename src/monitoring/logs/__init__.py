@@ -15,6 +15,9 @@ def build_log_processor(
     raw: dict,
     notifiers_by_type: dict[str, Notifier],
 ) -> LogProcessor | None:
+    """Build the stream consumer. Notifier dispatch happens via TaskIQ tasks
+    (tasks.logs.*), so this factory only validates that at least one notifier
+    is reachable — it doesn't pass the list down."""
     if not raw:
         return None
 
@@ -28,14 +31,14 @@ def build_log_processor(
 
     selected = raw.get("notifier")
     if selected and selected in notifiers_by_type:
-        target = [notifiers_by_type[selected]]
+        target_count = 1
     elif selected:
         log.warning("logs: notifier %r not found", selected)
-        target = []
+        target_count = 0
     else:
-        target = list(notifiers_by_type.values())
+        target_count = len(notifiers_by_type)
 
-    if not target:
+    if target_count == 0:
         return None
 
     sources = []
@@ -64,11 +67,11 @@ def build_log_processor(
     if not sources:
         return None
 
-    lang = raw.get("lang") or getattr(target[0], "lang", "en")
+    sample = next(iter(notifiers_by_type.values()))
+    lang = raw.get("lang") or getattr(sample, "lang", "en")
 
     return LogProcessor(
         sources=sources,
-        notifiers=target,
         storage=storage,
         digest_interval=float(raw.get("digest_interval", 3600)),
         max_signatures=int(raw.get("max_signatures", 5000)),

@@ -1,7 +1,6 @@
 import logging
 
 from ..notifiers.base import Notifier
-from .runner import ReportRunner
 from .sections.base import Section
 from .sections.dlq import DlqSection
 from .sections.docker import DockerComposeSection
@@ -12,12 +11,13 @@ from .sections.vps import VpsSection
 log = logging.getLogger(__name__)
 
 
-def build_report_runner(
+def build_report_context(
     raw: dict,
     notifiers_by_type: dict[str, Notifier],
     logs_storage_path: str | None = None,
-) -> ReportRunner | None:
-    interval = float(raw.get("interval", 300))
+) -> dict | None:
+    """Returns {hostname, lang, sections, targets} or None if nothing to render
+    or no notifier picked up. Caller schedules the actual digest via TaskIQ."""
     hostname = raw.get("hostname", "")
 
     selected = raw.get("notifier")
@@ -33,13 +33,12 @@ def build_report_runner(
     if not sections or not target:
         return None
 
-    return ReportRunner(
-        interval=interval,
-        hostname=hostname,
-        sections=sections,
-        notifiers=target,
-        lang=lang,
-    )
+    return {
+        "hostname": hostname,
+        "lang": lang,
+        "sections": sections,
+        "targets": target,
+    }
 
 
 def _build_sections(

@@ -6,3 +6,4 @@ rich>=13.7
 questionary>=2.0
 fastapi>=0.115
 uvicorn[standard]>=0.32
+taskiq>=0.11

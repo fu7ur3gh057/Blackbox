@@ -7,14 +7,14 @@ CONFIG := config.yaml
 SERVICE := blackbox
 UNIT_PATH := /etc/systemd/system/$(SERVICE).service
 
-.PHONY: help setup install run web install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
+.PHONY: help setup install run run-web install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
 
 help:
 	@echo "BlackBox — targets:"
 	@echo "  make setup              интерактивная настройка (config.yaml + опц. systemd)"
 	@echo "  make install            создать venv и поставить зависимости"
-	@echo "  make run                запустить демон в foreground (нужен $(CONFIG))"
-	@echo "  make web                запустить FastAPI на 127.0.0.1:8765"
+	@echo "  make run                воркер в foreground (нужен $(CONFIG))"
+	@echo "  make run-web            воркер + FastAPI на 127.0.0.1:8765"
 	@echo "  make install-service    поставить systemd-юнит (sudo)"
 	@echo "  make uninstall-service  остановить и удалить systemd-юнит (sudo)"
 	@echo "  make install-cli        поставить глобальную команду 'blackbox' в ~/.local/bin"
@@ -34,8 +34,9 @@ run: install
 	@if [ ! -f $(CONFIG) ]; then echo "$(CONFIG) не найден — запусти 'make setup'"; exit 1; fi
 	PYTHONPATH=src $(PY) -m main $(CONFIG)
 
-web: install
-	PYTHONPATH=src $(PY) -m web
+run-web: install
+	@if [ ! -f $(CONFIG) ]; then echo "$(CONFIG) не найден — запусти 'make setup'"; exit 1; fi
+	PYTHONPATH=src $(PY) -m main $(CONFIG) --web
 
 install-service:
 	@bash deploy/scripts/install-service.sh

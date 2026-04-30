@@ -1,10 +1,20 @@
+"""Log stream consumer.
+
+Streams from configured sources (file/journal/docker poll), dedups by
+signature, persists every line to JsonlStorage, and routes notifications
+through the TaskIQ broker (`tasks.logs.notify_log_first`,
+`tasks.logs.notify_log_digest`) — the actual `send_log_first`/`send_log_digest`
+notifier calls happen in those tasks. The processor itself is a long-lived
+coroutine because most sources are async iterators and per-line task wrap
+would be too granular.
+"""
+
 import asyncio
 import hashlib
 import logging
 import re
 import time
 
-from ..notifiers.base import Notifier
 from .base import LogSource
 from .storage import JsonlStorage
 
@@ -25,19 +35,15 @@ def _signature(line: str) -> str:
 
 
 class LogProcessor:
-    """Reads sources, dedups by signature, sends first-seen and periodic digest."""
-
     def __init__(
         self,
         sources: list[LogSource],
-        notifiers: list[Notifier],
         storage: JsonlStorage,
         digest_interval: float = 3600.0,
         max_signatures: int = 5000,
         lang: str = "en",
     ) -> None:
         self.sources = sources
-        self.notifiers = notifiers
         self.storage = storage
         self.digest_interval = digest_interval
         self.max_signatures = max_signatures
@@ -93,7 +99,7 @@ class LogProcessor:
             log.exception("logs: storage append failed")
 
         if first:
-            asyncio.create_task(self._send_first(source_name, line))
+            asyncio.create_task(self._kick_first(source_name, line))
 
     def _evict_if_needed(self) -> None:
         if len(self._sigs) < self.max_signatures:
@@ -102,12 +108,14 @@ class LogProcessor:
         for sig, _ in oldest[: self.max_signatures // 5]:
             self._sigs.pop(sig, None)
 
-    async def _send_first(self, source: str, line: str) -> None:
-        for n in self.notifiers:
-            try:
-                await n.send_log_first(source, line)
-            except Exception:
-                log.exception("logs: send_log_first failed for %s", type(n).__name__)
+    async def _kick_first(self, source: str, line: str) -> None:
+        # Imported lazily — tasks/logs.py imports the broker, which expects
+        # broker.startup() to have already happened by the time we kick.
+        from tasks.logs import notify_log_first
+        try:
+            await notify_log_first.kiq(source, line)
+        except Exception:
+            log.exception("logs: failed to kick notify_log_first")
 
     async def _digest_loop(self) -> None:
         while True:
@@ -126,11 +134,11 @@ class LogProcessor:
         repeats = repeats[:10]
 
         period = self._period_label()
-        for n in self.notifiers:
-            try:
-                await n.send_log_digest(repeats, period_label=period)
-            except Exception:
-                log.exception("logs: send_log_digest failed for %s", type(n).__name__)
+        from tasks.logs import notify_log_digest
+        try:
+            await notify_log_digest.kiq(repeats, period)
+        except Exception:
+            log.exception("logs: failed to kick notify_log_digest")
 
         for info in self._sigs.values():
             info["since_digest"] = 0

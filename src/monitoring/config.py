@@ -24,6 +24,7 @@ class Config:
     notifiers: list[NotifierConfig]
     report: dict | None = None
     logs: dict | None = None
+    web: dict | None = None
 
 
 def load_config(path: Path) -> Config:
@@ -46,4 +47,5 @@ def load_config(path: Path) -> Config:
         notifiers=notifiers,
         report=raw.get("report"),
         logs=raw.get("logs"),
+        web=raw.get("web"),
     )

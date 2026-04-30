@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from web.lifetime import lifespan
-from web.routes import api_router
+from web.apis import api_router
 
 
 # Default to Next.js dev server. In prod (behind SSH tunnel) CORS is moot —
