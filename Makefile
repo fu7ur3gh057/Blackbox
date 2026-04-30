@@ -8,10 +8,7 @@ SERVICE := blackbox
 UNIT_PATH := /etc/systemd/system/$(SERVICE).service
 CLIENT_DIR := client
 
-# pnpm preferred, fall back to npm
-PKG := $(shell command -v pnpm 2>/dev/null || command -v npm 2>/dev/null)
-
-.PHONY: help setup install run run-web client-install client-dev client-build client-clean install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
+.PHONY: help setup install run run-web ensure-node client-install client-dev client-build client-clean install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
 
 help:
 	@echo "BlackBox — targets:"
@@ -50,17 +47,31 @@ run-web: install
 
 # ── client (Next.js) ─────────────────────────────────────────────────────
 
-client-install:
-	@if [ -z "$(PKG)" ]; then echo "neither pnpm nor npm found — install Node 20+ first"; exit 1; fi
-	cd $(CLIENT_DIR) && $(PKG) install
+# Auto-install Node.js >= 18 if missing (NodeSource on apt/dnf, distro repo
+# on pacman/apk). No-op when Node is already present.
+ensure-node:
+	@bash -c '. deploy/scripts/_bootstrap.sh && ensure_node'
 
-client-dev:
-	@if [ -z "$(PKG)" ]; then echo "neither pnpm nor npm found"; exit 1; fi
-	cd $(CLIENT_DIR) && $(PKG) run dev
+# pnpm preferred, fall back to npm — resolved at recipe runtime so the
+# detection picks up Node that was just installed by `ensure-node`.
+PKG_LOOKUP := PKG=$$(command -v pnpm 2>/dev/null || command -v npm 2>/dev/null); \
+	if [ -z "$$PKG" ]; then echo "neither pnpm nor npm found"; exit 1; fi
 
-client-build:
-	@if [ -z "$(PKG)" ]; then echo "neither pnpm nor npm found"; exit 1; fi
-	cd $(CLIENT_DIR) && $(PKG) run build
+client-install: ensure-node
+	@$(PKG_LOOKUP); cd $(CLIENT_DIR) && $$PKG install
+
+client-dev: ensure-node
+	@$(PKG_LOOKUP); cd $(CLIENT_DIR) && $$PKG run dev
+
+# `client-build` now also installs deps when node_modules is missing — so
+# a fresh checkout only needs `make client-build` (not -install + -build).
+client-build: ensure-node
+	@$(PKG_LOOKUP); \
+	if [ ! -d $(CLIENT_DIR)/node_modules ]; then \
+		echo "  node_modules missing — installing first..."; \
+		cd $(CLIENT_DIR) && $$PKG install; cd ..; \
+	fi; \
+	cd $(CLIENT_DIR) && $$PKG run build
 
 client-clean:
 	rm -rf $(CLIENT_DIR)/.next $(CLIENT_DIR)/out

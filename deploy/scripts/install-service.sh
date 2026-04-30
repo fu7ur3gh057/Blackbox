@@ -8,5 +8,6 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=_bootstrap.sh
 . "$SCRIPT_DIR/_bootstrap.sh"
 ensure_venv "$PROJECT_ROOT" || exit 1
+ensure_node || true
 
 exec .venv/bin/python "$SCRIPT_DIR/setup.py" --install-service "$@"

@@ -77,3 +77,96 @@ EOF
     .venv/bin/python -m pip install -q --upgrade pip
     .venv/bin/python -m pip install -q -r requirements.txt
 }
+
+
+# Ensure Node.js >= 18 is available for the web client build.
+#
+# Returns 0 on success, 1 if Node is unavailable AND we couldn't auto-install
+# (no sudo, unknown distro). The caller decides whether to abort or continue
+# with a warning — by default we don't block the wizard, since the daemon
+# runs fine without the client (the / route just shows a placeholder).
+ensure_node() {
+    if command -v node >/dev/null 2>&1; then
+        local ver
+        ver=$(node --version 2>/dev/null | sed 's/^v//;s/\..*//')
+        if [ -n "$ver" ] && [ "$ver" -ge 18 ] 2>/dev/null; then
+            return 0
+        fi
+        echo "  node $(node --version) is too old, need >= 18" >&2
+    fi
+
+    local SUDO=""
+    if [ "$(id -u)" -ne 0 ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            SUDO="sudo"
+        else
+            cat >&2 <<'EOF'
+
+Node.js >= 18 is required for the web client and was not found.
+Install manually, then re-run:
+
+  Debian/Ubuntu:
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+    sudo apt install -y nodejs
+
+  RHEL/Fedora:
+    curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+    sudo dnf install -y nodejs
+
+  Arch:    sudo pacman -S --noconfirm nodejs npm
+  Alpine:  sudo apk add --no-cache nodejs npm
+
+EOF
+            return 1
+        fi
+    fi
+
+    echo "  Node.js missing — installing..."
+
+    if command -v apt-get >/dev/null 2>&1; then
+        if ! command -v curl >/dev/null 2>&1; then
+            $SUDO apt-get update -qq >/dev/null 2>&1 || true
+            $SUDO apt-get install -y -qq curl ca-certificates >/dev/null 2>&1 || true
+        fi
+        if curl -fsSL https://deb.nodesource.com/setup_20.x 2>/dev/null | $SUDO -E bash - >/dev/null 2>&1 \
+           && $SUDO apt-get install -y -qq nodejs >/dev/null 2>&1; then
+            echo "  ✓ installed node $(node --version 2>/dev/null)"
+            return 0
+        fi
+
+    elif command -v dnf >/dev/null 2>&1; then
+        if curl -fsSL https://rpm.nodesource.com/setup_20.x 2>/dev/null | $SUDO bash - >/dev/null 2>&1 \
+           && $SUDO dnf install -y nodejs >/dev/null 2>&1; then
+            echo "  ✓ installed node $(node --version 2>/dev/null)"
+            return 0
+        fi
+    elif command -v yum >/dev/null 2>&1; then
+        if curl -fsSL https://rpm.nodesource.com/setup_20.x 2>/dev/null | $SUDO bash - >/dev/null 2>&1 \
+           && $SUDO yum install -y nodejs >/dev/null 2>&1; then
+            echo "  ✓ installed node $(node --version 2>/dev/null)"
+            return 0
+        fi
+
+    elif command -v pacman >/dev/null 2>&1; then
+        if $SUDO pacman -Sy --noconfirm nodejs npm >/dev/null 2>&1; then
+            echo "  ✓ installed node $(node --version 2>/dev/null)"
+            return 0
+        fi
+
+    elif command -v apk >/dev/null 2>&1; then
+        if $SUDO apk add --no-cache nodejs npm >/dev/null 2>&1; then
+            echo "  ✓ installed node $(node --version 2>/dev/null)"
+            return 0
+        fi
+    fi
+
+    cat >&2 <<'EOF'
+
+Failed to auto-install Node.js. Install it manually with your package
+manager, then re-run. The client build will be skipped this run; the
+daemon will still start (you'll see a placeholder page until the bundle
+is built).
+
+EOF
+    return 1
+}

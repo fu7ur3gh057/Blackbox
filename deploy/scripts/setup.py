@@ -92,6 +92,25 @@ LOCALES: dict[str, dict[str, str]] = {
         "step_detect_systemd": "detecting running services",
         "systemd_pick": "Which services to alert on if they go down?",
         "systemd_none": "no user services detected",
+        "section_logs": "Logs (errors → digest)",
+        "ask_logs_yn": "collect logs and ship error digests?",
+        "step_detect_logs": "probing for log sources",
+        "logs_pick": "Which log sources to collect?",
+        "logs_no_candidates": "no log sources detected on this host",
+        "logs_journal_warn": "{user} is not in the `systemd-journal` group — without it the daemon can't read system journal in dev mode",
+        "logs_journal_auto": "add automatically? (sudo usermod -aG systemd-journal {user})",
+        "logs_journal_done": "group membership updated — for the current shell run `newgrp systemd-journal` or re-login ({user})",
+        "logs_journal_failed": "automatic add failed",
+        "logs_journal_manual": "run this in another terminal:",
+        "logs_journal_recheck": "check again?",
+        "logs_journal_still_no": "still not in the group — try `newgrp` or re-login",
+        "ask_logs_digest": "  digest interval, sec — how often the dedup roll-up fires",
+        "ask_logs_retention": "  retention, days — auto-prune events older than this",
+        "ask_logs_max_rows": "  max rows — hard cap on the log_events table",
+        "logs_label_journal": "journal · {unit}",
+        "logs_label_file": "file · {path}",
+        "logs_label_docker": "docker · {service}",
+        "logs_hint_perm": "[dim]not readable for {user} — daemon must run as root or fix perms[/dim]",
         "section_web": "Web client (FastAPI)",
         "ask_web_yn": "expose the web client (Swagger + admin API)?",
         "ask_web_port": "  port",
@@ -196,6 +215,25 @@ LOCALES: dict[str, dict[str, str]] = {
         "step_detect_systemd": "ищу запущенные сервисы",
         "systemd_pick": "Какие сервисы алертить при падении?",
         "systemd_none": "пользовательских сервисов не найдено",
+        "section_logs": "Логи (ошибки → дайджест)",
+        "ask_logs_yn": "собирать логи и слать дайджест ошибок?",
+        "step_detect_logs": "ищу источники логов",
+        "logs_pick": "Какие источники логов собираем?",
+        "logs_no_candidates": "источников логов на этом хосте не нашлось",
+        "logs_journal_warn": "{user} не в группе `systemd-journal` — без неё демон не сможет читать system journal в dev-режиме",
+        "logs_journal_auto": "добавить автоматически? (sudo usermod -aG systemd-journal {user})",
+        "logs_journal_done": "группа добавлена — для текущей сессии: `newgrp systemd-journal` либо перезайди ({user})",
+        "logs_journal_failed": "автоматически не вышло",
+        "logs_journal_manual": "выполни в другом терминале:",
+        "logs_journal_recheck": "проверить?",
+        "logs_journal_still_no": "всё ещё не в группе — попробуй `newgrp` или перезайди",
+        "ask_logs_digest": "  интервал дайджеста, сек — как часто шлём роллап",
+        "ask_logs_retention": "  retention, дней — автоматическое удаление старше",
+        "ask_logs_max_rows": "  макс. строк — хард-кап таблицы log_events",
+        "logs_label_journal": "journal · {unit}",
+        "logs_label_file": "file · {path}",
+        "logs_label_docker": "docker · {service}",
+        "logs_hint_perm": "[dim]не читается для {user} — демон должен быть от root или поправь права[/dim]",
         "section_web": "Веб-клиент (FastAPI)",
         "ask_web_yn": "поднимать веб-клиент (Swagger + admin API)?",
         "ask_web_port": "  порт",
@@ -441,6 +479,11 @@ def run_wizard() -> None:
     if Confirm.ask(f"  {t('ask_systemd_yn')}", default=False):
         systemd_units = configure_systemd()
 
+    section(t("section_logs"))
+    logs_cfg = configure_logs(
+        systemd_units=systemd_units, docker_blocks=docker_blocks,
+    )
+
     section(t("section_web"))
     web_cfg = configure_web()
 
@@ -452,6 +495,7 @@ def run_wizard() -> None:
         warn_pct=int(warn_pct), crit_pct=int(crit_pct),
         disks=disks, docker_blocks=docker_blocks,
         net_cfg=net_cfg, systemd_units=systemd_units,
+        logs_cfg=logs_cfg,
         web_cfg=web_cfg,
         notifier_lang=LANG,
     )
@@ -644,6 +688,278 @@ def configure_systemd() -> list[str]:
     ]
     console.print(f"  [dim]{t('docker_hint')}[/dim]")
     return questionary.checkbox(t("systemd_pick"), choices=choices).ask() or []
+
+
+# ── logs detection + journal-group bootstrap ──────────────────────────────
+
+
+def _detect_user() -> str | None:
+    """Best-effort: SUDO_USER (if wizard is launched via sudo), $USER, or
+    `id -un` as a last resort."""
+    u = os.environ.get("SUDO_USER") or os.environ.get("USER")
+    if u:
+        return u
+    try:
+        return subprocess.run(
+            ["id", "-un"], capture_output=True, text=True, timeout=2,
+        ).stdout.strip() or None
+    except Exception:
+        return None
+
+
+def _user_in_group(user: str, group: str) -> bool:
+    """Reads `getent group <group>` so we see fresh `usermod -aG` results
+    without needing the user to re-login."""
+    try:
+        r = subprocess.run(
+            ["getent", "group", group],
+            capture_output=True, text=True, timeout=2,
+        )
+        if r.returncode != 0:
+            return False
+        members = r.stdout.strip().split(":")[-1].split(",")
+        return user in members
+    except Exception:
+        return False
+
+
+def _systemd_unit_exists(unit: str) -> bool:
+    try:
+        r = subprocess.run(
+            ["systemctl", "cat", unit, "--no-pager"],
+            capture_output=True, timeout=2,
+        )
+        return r.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+def _resolve_ssh_unit() -> str | None:
+    for u in ("ssh.service", "sshd.service"):
+        if _systemd_unit_exists(u):
+            return u
+    return None
+
+
+def ensure_journal_access() -> bool:
+    """If the current user can already read the system journal (root, or
+    member of `systemd-journal`), no-op. Otherwise offer to fix it via
+    `sudo usermod -aG`; on failure, fall back to a manual command and
+    poll the group file until the user has been added."""
+    if os.geteuid() == 0:
+        return True
+    if not shutil.which("journalctl"):
+        return True  # nothing to gate
+
+    user = _detect_user()
+    if not user:
+        return False
+    if _user_in_group(user, "systemd-journal"):
+        return True
+
+    warn_line(t("logs_journal_warn", user=user))
+    if Confirm.ask(f"  {t('logs_journal_auto', user=user)}", default=True):
+        try:
+            subprocess.run(
+                ["sudo", "usermod", "-aG", "systemd-journal", user],
+                check=True,
+            )
+        except subprocess.CalledProcessError:
+            warn_line(t("logs_journal_failed"))
+        else:
+            if _user_in_group(user, "systemd-journal"):
+                warn_line(t("logs_journal_done", user=user))
+                return True
+            warn_line(t("logs_journal_failed"))
+
+    # Manual fallback — show command, wait until /etc/group reflects it.
+    console.print()
+    console.print(f"  {t('logs_journal_manual')}")
+    console.print(f"    [cyan]sudo usermod -aG systemd-journal {user}[/cyan]\n")
+    while True:
+        if not Confirm.ask(f"  {t('logs_journal_recheck')}", default=True):
+            return False
+        if _user_in_group(user, "systemd-journal"):
+            warn_line(t("logs_journal_done", user=user))
+            return True
+        warn_line(t("logs_journal_still_no"))
+
+
+# Common file presets — slug, path, regex, default-checked. Only those that
+# exist AND are readable for the wizard's user end up in the chooser.
+_FILE_PRESETS: list[tuple[str, str, str, bool]] = [
+    ("auth",         "/var/log/auth.log",     r"(?i)failed|invalid|sudo|error",     True),
+    ("syslog",       "/var/log/syslog",       r"(?i)error|warn|fail|critical",      False),
+    ("nginx-error",  "/var/log/nginx/error.log",  r".+",                            True),
+    ("nginx-access", "/var/log/nginx/access.log", r" (5\d\d) ",                     False),
+    ("fail2ban",     "/var/log/fail2ban.log", r"(?i)ban|unban|found",               True),
+    ("kern",         "/var/log/kern.log",     r"(?i)error|warn|oops|panic|oom",     False),
+]
+
+
+def detect_log_sources(
+    *, systemd_units: list[str], docker_blocks: list[dict],
+) -> list[dict]:
+    """Build a list of candidate log sources based on what's actually
+    present on the host. Each candidate is a dict with `kind` and the
+    fields a log-source needs ({type, name, …, pattern, _default})."""
+    out: list[dict] = []
+    user = _detect_user() or ""
+
+    # ── journal candidates ────────────────────────────────────────────
+    if shutil.which("journalctl"):
+        # Always-useful units, if present.
+        ssh_unit = _resolve_ssh_unit()
+        always: list[tuple[str, str, str, bool]] = []
+        if ssh_unit:
+            always.append((
+                "ssh", ssh_unit,
+                r"(?i)failed|invalid|accepted|sudo|error",
+                True,
+            ))
+        if _systemd_unit_exists("cron.service"):
+            always.append((
+                "cron", "cron.service",
+                r"(?i)error|fail|exit\s*\(?code\s*\)?\s*[1-9]",
+                False,
+            ))
+        # Self-reflection — the unit is created by install-service step,
+        # may not exist yet during a fresh wizard run, so we still offer it.
+        always.append((
+            "blackbox", "blackbox.service",
+            r"(?i)error|warn|exception|traceback",
+            True,
+        ))
+
+        seen_units: set[str] = set()
+        for slug, unit, pat, default in always:
+            seen_units.add(unit)
+            out.append({
+                "kind": "journal",
+                "type": "journal",
+                "name": slug,
+                "unit": unit,
+                "pattern": pat,
+                "_label": t("logs_label_journal", unit=unit),
+                "_default": default,
+            })
+
+        # User-selected systemd units worth tailing too.
+        for unit in systemd_units:
+            if unit in seen_units:
+                continue
+            slug = "j-" + unit.replace(".service", "").replace(".", "-")
+            out.append({
+                "kind": "journal",
+                "type": "journal",
+                "name": slug,
+                "unit": unit,
+                "pattern": r"(?i)error|warn|fail|exception|critical",
+                "_label": t("logs_label_journal", unit=unit),
+                "_default": False,
+            })
+
+    # ── file candidates ───────────────────────────────────────────────
+    for slug, path, pat, default in _FILE_PRESETS:
+        p = Path(path)
+        if not p.is_file():
+            continue
+        readable = os.access(p, os.R_OK)
+        out.append({
+            "kind": "file",
+            "type": "file",
+            "name": slug,
+            "path": str(p),
+            "pattern": pat,
+            "_label": t("logs_label_file", path=str(p)),
+            "_default": default and readable,
+            "_readable": readable,
+            "_user": user,
+        })
+
+    # ── docker candidates from earlier compose selection ──────────────
+    for blk in docker_blocks:
+        compose_path = blk.get("compose")
+        if not compose_path:
+            continue
+        for svc in blk.get("containers") or []:
+            slug = "docker-" + svc
+            out.append({
+                "kind": "docker",
+                "type": "docker",
+                "name": slug,
+                "compose": compose_path,
+                "service": svc,
+                "pattern": r"(?i)error|fatal|exception|traceback|critical",
+                "poll_interval": 60,
+                "_label": t("logs_label_docker", service=svc),
+                "_default": False,
+            })
+
+    return out
+
+
+def configure_logs(
+    *, systemd_units: list[str], docker_blocks: list[dict],
+) -> dict | None:
+    """Returns the `logs:` config block, or None if user opts out / no
+    candidates / user picked nothing."""
+    if not Confirm.ask(f"  {t('ask_logs_yn')}", default=True):
+        return None
+
+    # Try to make sure the daemon (in dev mode) has journal access.
+    # Service mode runs as root and doesn't need the group.
+    ensure_journal_access()
+
+    candidates = step(
+        t("step_detect_logs"),
+        lambda: detect_log_sources(
+            systemd_units=systemd_units, docker_blocks=docker_blocks,
+        ),
+        delay=0.0,
+    )
+    if not candidates:
+        warn_line(t("logs_no_candidates"))
+        return None
+
+    choices = []
+    for c in candidates:
+        title = c["_label"]
+        if c["kind"] == "file" and not c.get("_readable", True):
+            title += "  " + t("logs_hint_perm", user=c.get("_user", ""))
+        choices.append(questionary.Choice(
+            title=title, value=c["name"], checked=c["_default"],
+        ))
+
+    console.print(f"  [dim]{t('docker_hint')}[/dim]")
+    picked = questionary.checkbox(t("logs_pick"), choices=choices).ask() or []
+    picked_set = set(picked)
+
+    sources: list[dict] = []
+    for c in candidates:
+        if c["name"] not in picked_set:
+            continue
+        # Strip private fields (anything starting with _) before emitting.
+        sources.append({k: v for k, v in c.items() if not k.startswith("_") and k != "kind"})
+
+    if not sources:
+        return None
+
+    digest = _ask_seconds("ask_logs_digest", default=3600, minimum=60)
+    retention_days = int(Prompt.ask(t("ask_logs_retention"), default="7") or "7")
+    max_rows_raw = Prompt.ask(t("ask_logs_max_rows"), default="200000") or "200000"
+    try:
+        max_rows = int(max_rows_raw.replace("_", "").replace(",", ""))
+    except ValueError:
+        max_rows = 200_000
+
+    return {
+        "notifier": "telegram",
+        "digest_interval": digest,
+        "retention_days": max(1, retention_days),
+        "max_rows": max(1000, max_rows),
+        "sources": sources,
+    }
 
 
 # ── web client ─────────────────────────────────────────────────────────────
@@ -954,6 +1270,59 @@ def _slug(path: str) -> str:
     return s or "root"
 
 
+def _yaml_escape(s: str) -> str:
+    """Quote-safely render a string inside double quotes (covers patterns
+    that contain regex backslashes, quotes, etc.)."""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _render_logs_yaml(logs_cfg: dict) -> str:
+    """Render the `logs:` block. Storage is SQLite-backed; the only knobs
+    are retention + max-rows so the file stays bounded."""
+    notifier = logs_cfg.get("notifier", "telegram")
+    digest = int(logs_cfg.get("digest_interval", 3600))
+    retention = int(logs_cfg.get("retention_days", 7))
+    max_rows = int(logs_cfg.get("max_rows", 200_000))
+
+    lines = [
+        "",
+        "logs:",
+        f"  notifier: {notifier}",
+        f"  digest_interval: {digest}",
+        f"  retention_days: {retention}",
+        f"  max_rows: {max_rows}",
+        "  sources:",
+    ]
+    for s in logs_cfg.get("sources") or []:
+        kind = s.get("type")
+        name = s.get("name")
+        pattern = _yaml_escape(s.get("pattern", ".+"))
+        if kind == "journal":
+            lines += [
+                f"    - type: journal",
+                f"      name: {name}",
+                f"      unit: {s['unit']}",
+                f'      pattern: "{pattern}"',
+            ]
+        elif kind == "file":
+            lines += [
+                f"    - type: file",
+                f"      name: {name}",
+                f"      path: {s['path']}",
+                f'      pattern: "{pattern}"',
+            ]
+        elif kind == "docker":
+            lines += [
+                f"    - type: docker",
+                f"      name: {name}",
+                f'      compose: "{s["compose"]}"',
+                f"      service: {s['service']}",
+                f'      pattern: "{pattern}"',
+                f"      poll_interval: {int(s.get('poll_interval', 60))}",
+            ]
+    return "\n".join(lines) + "\n"
+
+
 def build_yaml(
     *,
     bot_token: str,
@@ -968,6 +1337,7 @@ def build_yaml(
     docker_blocks: list[dict],
     net_cfg: dict | bool = True,
     systemd_units: list[str] | None = None,
+    logs_cfg: dict | None = None,
     web_cfg: dict | None = None,
     notifier_lang: str = "en",
 ) -> str:
@@ -1035,6 +1405,9 @@ report:
                 parts.append(f"      containers: [{', '.join(b['containers'])}]\n")
             if b["starred"]:
                 parts.append(f"      starred: [{', '.join(b['starred'])}]\n")
+
+    if logs_cfg:
+        parts.append(_render_logs_yaml(logs_cfg))
 
     if web_cfg and web_cfg.get("enabled"):
         port = int(web_cfg.get("port", 8765))
