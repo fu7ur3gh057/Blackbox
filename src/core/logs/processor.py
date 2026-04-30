@@ -127,6 +127,13 @@ class LogProcessor:
 
         await self._persist_sig(sig, source_name, line, now, self._sigs[sig]["total"], first)
 
+        # Live push to /logs subscribers; no-op when web isn't running.
+        from web.sockets import emit
+        asyncio.create_task(emit("/logs", "log:line", {
+            "ts": now, "source": source_name, "sig": sig,
+            "first": first, "line": line[:2000],
+        }))
+
         if first:
             asyncio.create_task(self._kick_first(source_name, line))
 
@@ -192,6 +199,9 @@ class LogProcessor:
             await notify_log_digest.kiq(repeats, period)
         except Exception:
             log.exception("logs: failed to kick notify_log_digest")
+
+        from web.sockets import emit
+        await emit("/logs", "log:digest", {"items": repeats, "period": period})
 
         for info in self._sigs.values():
             info["since_digest"] = 0

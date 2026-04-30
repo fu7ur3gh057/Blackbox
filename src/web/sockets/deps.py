@@ -1,14 +1,16 @@
-"""Dependencies для Socket.IO."""
+"""FastAPI deps for the Socket.IO server. Same pattern as services/db/deps:
+the AsyncServer lives on broker.state so handlers can emit through the
+same instance the namespaces are bound to."""
 
-from socketio import ASGIApp, AsyncServer
-from starlette.requests import Request
+from socketio import AsyncServer
 
-
-async def get_sio_app(request: Request) -> ASGIApp:
-    """ASGI-приложение Socket.IO."""
-    return request.app.state.sio_app
+from services.taskiq.broker import broker
 
 
-async def get_sio_server(request: Request) -> AsyncServer:
-    """AsyncServer — для emit'а событий из FastAPI-эндпоинтов."""
-    return request.app.state.sio_server
+def get_sio_server() -> AsyncServer:
+    """Returns the running AsyncServer or raises if Socket.IO isn't
+    initialized (which happens in worker-only mode without --web)."""
+    sio = broker.state.data.get("sio_server")
+    if sio is None:
+        raise RuntimeError("socket.io not initialized")
+    return sio

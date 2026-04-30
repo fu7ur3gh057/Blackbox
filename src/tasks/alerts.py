@@ -23,8 +23,9 @@ async def send_alert(
     ctx: AppContext = TaskiqDepends(get_app_context),
     session: AsyncSession = TaskiqDepends(get_session),
 ) -> None:
+    now = time.time()
     session.add(AlertEvent(
-        ts=time.time(),
+        ts=now,
         name=alert.check,
         level=alert.level,
         kind=alert.kind or None,
@@ -38,3 +39,14 @@ async def send_alert(
             await n.send(alert)
         except Exception:
             log.exception("notifier %s failed", type(n).__name__)
+
+    # Push to /alerts namespace subscribers; no-op if web isn't running.
+    from web.sockets import emit
+    await emit("/alerts", "alert:fired", {
+        "ts": now,
+        "name": alert.check,
+        "level": alert.level,
+        "kind": alert.kind,
+        "detail": alert.detail,
+        "metrics": alert.metrics,
+    })

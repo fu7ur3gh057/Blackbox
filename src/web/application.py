@@ -48,4 +48,9 @@ def get_app(prefix: str | None = None) -> FastAPI:
     async def _health() -> dict[str, str]:
         return {"status": "ok"}
 
+    # Socket.IO — mounted under <prefix>/ws/socket.io. Same JWT secret as
+    # the REST API guards every namespace via AuthedNamespace.on_connect.
+    from web.sockets.lifetime import init_socketio
+    init_socketio(application, prefix=prefix, cors_origins=_DEFAULT_CORS)
+
     return application

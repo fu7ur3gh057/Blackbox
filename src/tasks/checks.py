@@ -59,6 +59,21 @@ async def run_check(
 
     await session.commit()
 
+    # Live update for the dashboard. Sent every tick (not only on
+    # transitions) so graphs stay smooth. Frontend that cares about a
+    # single check filters by `name` client-side; rooms exist on the
+    # namespace for future per-check broadcasts that the dashboard
+    # shouldn't see. No-op when web isn't running.
+    from web.sockets import emit
+    await emit("/checks", "check:result", {
+        "ts": now,
+        "name": name,
+        "level": result.level,
+        "kind": result.kind,
+        "detail": result.detail,
+        "metrics": result.metrics,
+    })
+
     if new_level is None:
         return
 
