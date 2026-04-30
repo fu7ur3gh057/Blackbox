@@ -73,3 +73,26 @@ export function releaseNamespace(ns: Namespace): void {
     delete shared[ns];
   }
 }
+
+/**
+ * Open a one-shot socket for the /terminal namespace.
+ *
+ * The auth payload is unique per session — every unlock issues a new
+ * token — so we can't use the shared/refcounted socket: by the time the
+ * caller sets `sock.auth`, the default `autoConnect: true` has already
+ * sent an empty handshake and the server has already refused.
+ *
+ * Caller is responsible for `.disconnect()` in the cleanup path.
+ */
+export function openTerminalSocket(terminalToken: string): Socket {
+  return io(`${safeOrigin()}/terminal`, {
+    path: SOCKET_PATH,
+    withCredentials: true,
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    auth: { terminal_token: terminalToken },
+    forceNew: true,            // never share a Manager with other namespaces
+  });
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import { api, ApiError } from "@/lib/api";
-import { connectNamespace, releaseNamespace } from "@/lib/socket";
+import { openTerminalSocket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
 import { Lock, Terminal as TerminalIcon, Zap, ZapOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -279,10 +279,12 @@ function TerminalSession({
       term.loadAddon(fit);
       term.open(containerRef.current);
 
-      const sock = connectNamespace("/terminal");
-      // Pass the terminal token in the auth payload — the namespace
-      // also reads bb_session from environ.cookie automatically.
-      sock.auth = { terminal_token: token };
+      // Fresh socket bound to this token. NOT shared via the
+      // refcounted cache — auth must travel with the very first
+      // handshake, otherwise the server rejects an empty connect and
+      // we end up on the "denied" branch even when the password was
+      // correct.
+      const sock = openTerminalSocket(token);
 
       const sendResize = () => {
         try {
@@ -322,10 +324,6 @@ function TerminalSession({
         if (sock.connected) sock.emit("input", { data });
       });
 
-      // Force the (re)connect now — sock.connect() is idempotent and
-      // makes sure the new auth payload is used.
-      if (!sock.connected) sock.connect();
-
       dispose = () => {
         ro.disconnect();
         sock.off("connect", onConnect);
@@ -333,7 +331,7 @@ function TerminalSession({
         sock.off("disconnect", onDisconnect);
         sock.off("terminal:output", onOutput);
         sock.off("terminal:exit", onExit);
-        releaseNamespace("/terminal");
+        sock.disconnect();
         term.dispose();
       };
     })().catch((e) => {
