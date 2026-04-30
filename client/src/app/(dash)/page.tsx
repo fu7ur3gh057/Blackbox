@@ -1,31 +1,35 @@
 import { AlertsFeed } from "@/components/widgets/alerts-feed";
 import { ChecksGrid } from "@/components/widgets/checks-grid";
-import { ChecksHistoryChart } from "@/components/widgets/checks-history-chart";
 import { DisksDonut } from "@/components/widgets/disks-donut";
+import { DockerGrid } from "@/components/widgets/docker-grid";
+import { HeroChart } from "@/components/widgets/hero-chart";
+import { LogsStream } from "@/components/widgets/logs-stream";
+import { StatusBanner } from "@/components/widgets/status-banner";
 import { SystemKpis } from "@/components/widgets/system-kpis";
 
 export default function Dashboard() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
-      {/* main column */}
-      <div className="space-y-4">
-        <SystemKpis />
+    <div className="px-6 pb-8 space-y-5">
+      <StatusBanner />
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <ChecksHistoryChart name="cpu" title="CPU" color="#F97316" />
-          <ChecksHistoryChart name="memory" title="Memory" color="#FBBF24" />
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-5">
+        <div className="space-y-5 min-w-0">
+          <SystemKpis />
+          <HeroChart />
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-5">
+            <ChecksGrid />
+            <DisksDonut />
+          </div>
+
+          <DockerGrid />
+          <LogsStream />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
-          <ChecksGrid />
-          <DisksDonut />
-        </div>
+        <aside className="xl:sticky xl:top-[112px] xl:self-start min-w-0">
+          <AlertsFeed />
+        </aside>
       </div>
-
-      {/* right sidebar */}
-      <aside className="lg:sticky lg:top-[80px] lg:self-start lg:max-h-[calc(100vh-100px)]">
-        <AlertsFeed />
-      </aside>
     </div>
   );
 }

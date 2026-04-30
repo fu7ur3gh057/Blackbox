@@ -6,19 +6,27 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          base:    "#0E0F12",   // page
-          surface: "#16181D",   // card
-          elev:    "#1E2128",   // popovers, modals
-          input:   "#1A1C22",
+          base:    "#07080B",
+          surface: "#13151B",
+          elev:    "#1A1D25",
+          input:   "#15171E",
         },
         border: {
-          DEFAULT: "#262A33",
-          soft:    "#1F232B",
+          DEFAULT: "rgba(255,255,255,0.08)",
+          soft:    "rgba(255,255,255,0.05)",
         },
         accent: {
-          DEFAULT: "#F97316",   // orange-500
-          soft:    "#FDBA74",   // orange-300 (for glow)
-          glow:    "rgba(249, 115, 22, 0.18)",
+          DEFAULT: "#F97316",
+          soft:    "#FDBA74",
+          glow:    "rgba(249, 115, 22, 0.20)",
+        },
+        violet: {
+          accent: "#A78BFA",
+          glow:   "rgba(167,139,250,0.20)",
+        },
+        cyan: {
+          accent: "#22D3EE",
+          glow:   "rgba(34,211,238,0.20)",
         },
         text: {
           strong: "#F4F4F5",
@@ -34,17 +42,15 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       borderRadius: {
-        card: "1.25rem",
+        card: "1.5rem",
       },
       boxShadow: {
-        glow: "0 0 60px -20px rgba(249, 115, 22, 0.45)",
-        card: "0 1px 0 0 rgba(255,255,255,0.03) inset, 0 4px 24px rgba(0,0,0,0.35)",
-      },
-      backgroundImage: {
-        "card-gradient":
-          "radial-gradient(120% 120% at 0% 0%, rgba(249,115,22,0.06) 0%, transparent 60%)",
+        glow:        "0 0 80px -24px rgba(249, 115, 22, 0.55)",
+        "glow-vio":  "0 0 80px -24px rgba(167, 139, 250, 0.55)",
+        "glow-cyan": "0 0 80px -24px rgba(34, 211, 238, 0.45)",
       },
     },
   },
