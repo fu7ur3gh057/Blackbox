@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "@/components/logo";
 import {
   LayoutDashboard,
   Activity,
@@ -26,17 +26,9 @@ export function LeftRail() {
   const pathname = usePathname();
   return (
     <aside className="relative flex flex-col items-center py-5 gap-2 h-full">
-      {/* logo — basePath baked in: next/image with unoptimized + static
-          export does not auto-prefix /blackbox to /public assets. */}
+      {/* logo — pure SVG, no PNG roundtrip and no basePath gotchas */}
       <Link href="/" className="mb-3" title="blackbox">
-        <Image
-          src="/blackbox/logo.png"
-          alt="blackbox"
-          width={40}
-          height={40}
-          className="h-10 w-10 drop-shadow-[0_0_12px_rgba(214,242,107,0.45)]"
-          priority
-        />
+        <Logo size={36} />
       </Link>
 
       {NAV.map(({ href, Icon, label }) => {

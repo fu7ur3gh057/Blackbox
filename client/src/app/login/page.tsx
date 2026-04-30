@@ -2,9 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/logo";
 import { ApiError } from "@/lib/api";
 import { auth } from "@/lib/auth";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -37,14 +37,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="panel w-full max-w-sm p-8">
         <div className="flex flex-col items-center text-center mb-7">
-          <Image
-            src="/blackbox/logo.png"
-            alt="blackbox"
-            width={72}
-            height={72}
-            className="h-[72px] w-[72px] drop-shadow-[0_0_22px_rgba(214,242,107,0.45)]"
-            priority
-          />
+          <Logo size={72} />
           <div className="mt-3 text-2xl font-semibold tracking-tight text-ink-strong font-mono">
             blackbox
           </div>
