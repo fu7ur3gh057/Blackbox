@@ -1,13 +1,17 @@
-"""LogProcessor: signature normalization, dedup, persistence, task dispatch."""
+"""LogProcessor: signature normalization, dedup, persistence, task dispatch.
+
+Uses the broker fixture so that broker.state.db_session_maker is available
+— the processor persists signatures through it. _record is async now."""
 
 import asyncio
 from pathlib import Path
 from typing import AsyncIterator
 
-import pytest
+from sqlmodel import select
 
 from core.logs.processor import LogProcessor, _signature
 from core.logs.storage import JsonlStorage
+from services.db.models import LogSignatureEntry
 
 
 class FakeSource:
@@ -34,7 +38,7 @@ def test_signature_keeps_distinct_messages_distinct():
     assert _signature("connection refused") != _signature("file not found")
 
 
-async def test_first_seen_kicks_notify_log_first(monkeypatch, tmp_path: Path):
+async def test_first_seen_kicks_notify_log_first(broker, monkeypatch, tmp_path: Path):
     storage = JsonlStorage(tmp_path / "log.jsonl")
     proc = LogProcessor([], storage, digest_interval=3600)
 
@@ -44,16 +48,14 @@ async def test_first_seen_kicks_notify_log_first(monkeypatch, tmp_path: Path):
         async def kiq(self, source, sample):
             kicked.append((source, sample))
 
-    # Patch the lazy import inside _kick_first
     monkeypatch.setattr("tasks.logs.notify_log_first", FakeKick())
 
-    proc._record("nginx", "Error: connection refused")
-    # _kick_first is fired via create_task — yield the loop once
-    await asyncio.sleep(0)
+    await proc._record("nginx", "Error: connection refused")
+    await asyncio.sleep(0)  # let the create_task'd kick run
     assert kicked == [("nginx", "Error: connection refused")]
 
 
-async def test_repeated_lines_dont_kick_first_again(monkeypatch, tmp_path: Path):
+async def test_repeated_lines_dont_kick_first_again(broker, monkeypatch, tmp_path: Path):
     storage = JsonlStorage(tmp_path / "log.jsonl")
     proc = LogProcessor([], storage, digest_interval=3600)
 
@@ -65,17 +67,65 @@ async def test_repeated_lines_dont_kick_first_again(monkeypatch, tmp_path: Path)
 
     monkeypatch.setattr("tasks.logs.notify_log_first", FakeKick())
 
-    proc._record("svc", "boom 1")
-    proc._record("svc", "boom 2")  # same signature post-normalization
+    await proc._record("svc", "boom 1")
+    await proc._record("svc", "boom 2")  # same signature post-normalization
     await asyncio.sleep(0)
     assert len(kicked) == 1
 
 
-async def test_digest_kicks_repeats_only(monkeypatch, tmp_path: Path):
+async def test_signature_persisted_to_db(broker, monkeypatch, tmp_path: Path):
+    """First-seen state survives daemon restart — verify the row lands in
+    log_signatures with total > 0."""
     storage = JsonlStorage(tmp_path / "log.jsonl")
     proc = LogProcessor([], storage, digest_interval=3600)
 
-    # Track first-kicks too so they don't accidentally show up in the digest
+    class _Noop:
+        async def kiq(self, *a, **k): pass
+    monkeypatch.setattr("tasks.logs.notify_log_first", _Noop())
+
+    await proc._record("svc", "error 1")
+    await proc._record("svc", "error 2")  # numbers normalize → same signature
+
+    async with broker.state.db_session_maker() as session:
+        rows = (await session.exec(select(LogSignatureEntry))).all()
+    assert len(rows) == 1
+    assert rows[0].total == 2
+    assert rows[0].source == "svc"
+
+
+async def test_processor_hydrates_signatures_from_db(broker, monkeypatch, tmp_path: Path):
+    """A fresh LogProcessor on the same DB should not re-fire `first` for
+    a signature that's already known."""
+    storage = JsonlStorage(tmp_path / "log.jsonl")
+
+    class _NoopOne:
+        async def kiq(self, *a, **k): pass
+    monkeypatch.setattr("tasks.logs.notify_log_first", _NoopOne())
+
+    proc1 = LogProcessor([], storage, digest_interval=3600)
+    await proc1._record("svc", "boom 1")  # writes signature
+
+    # Simulate restart: new processor instance, same DB
+    proc2 = LogProcessor([], storage, digest_interval=3600)
+    await proc2._hydrate_from_db()
+
+    kicked = []
+
+    class FakeKick:
+        async def kiq(self, source, sample):
+            kicked.append((source, sample))
+
+    monkeypatch.setattr("tasks.logs.notify_log_first", FakeKick())
+
+    await proc2._record("svc", "boom 2")  # numbers normalize → same signature
+    await asyncio.sleep(0)
+    assert kicked == [], "should not re-fire first-seen for a known signature"
+
+
+async def test_digest_kicks_repeats_only(broker, monkeypatch, tmp_path: Path):
+    storage = JsonlStorage(tmp_path / "log.jsonl")
+    proc = LogProcessor([], storage, digest_interval=3600)
+
     class _NoopFirst:
         async def kiq(self, *a, **k):
             pass
@@ -90,16 +140,15 @@ async def test_digest_kicks_repeats_only(monkeypatch, tmp_path: Path):
 
     monkeypatch.setattr("tasks.logs.notify_log_digest", FakeDigest())
 
-    # 3 hits of one signature, 1 of another
-    proc._record("svc", "error 1")
-    proc._record("svc", "error 2")
-    proc._record("svc", "error 3")
-    proc._record("svc", "warning N")  # different signature, single hit
+    # 3 hits of one signature, 1 of another (different message)
+    await proc._record("svc", "error 1")
+    await proc._record("svc", "error 2")
+    await proc._record("svc", "error 3")
+    await proc._record("svc", "warning N")
     await asyncio.sleep(0)
 
     await proc._send_digest()
 
-    # Only the 3-hit signature should be in the digest
     assert captured["items"]
     assert all(item["count"] >= 2 for item in captured["items"])
     assert sum(item["count"] for item in captured["items"]) == 3
@@ -112,7 +161,7 @@ def test_period_label_ru_vs_en():
     assert "hour" in p_en._period_label()
 
 
-async def test_run_with_source_consumes_lines(monkeypatch, tmp_path: Path):
+async def test_run_with_source_consumes_lines(broker, monkeypatch, tmp_path: Path):
     storage = JsonlStorage(tmp_path / "log.jsonl")
     src = FakeSource("svc", ["error a", "error a", "error a"])
     proc = LogProcessor([src], storage, digest_interval=3600)
@@ -122,7 +171,6 @@ async def test_run_with_source_consumes_lines(monkeypatch, tmp_path: Path):
     monkeypatch.setattr("tasks.logs.notify_log_first", _Noop())
     monkeypatch.setattr("tasks.logs.notify_log_digest", _Noop())
 
-    # Run with a small timeout — the digest loop sleeps 3600s, source finishes quickly
     task = asyncio.create_task(proc._consume(src))
     await asyncio.wait_for(task, timeout=2)
 

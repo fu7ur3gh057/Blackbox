@@ -2,11 +2,13 @@
 
 Streams from configured sources (file/journal/docker poll), dedups by
 signature, persists every line to JsonlStorage, and routes notifications
-through the TaskIQ broker (`tasks.logs.notify_log_first`,
-`tasks.logs.notify_log_digest`) — the actual `send_log_first`/`send_log_digest`
-notifier calls happen in those tasks. The processor itself is a long-lived
-coroutine because most sources are async iterators and per-line task wrap
-would be too granular.
+through TaskIQ tasks (`tasks.logs.notify_log_first`,
+`tasks.logs.notify_log_digest`).
+
+Signature state lives in SQLite (`log_signatures`) so first-seen dedup
+survives daemon restarts; an in-memory `_sigs` cache fronts the DB on the
+hot path. The processor itself is a long-lived coroutine because most
+sources are async iterators and per-line task wrap would be too granular.
 """
 
 import asyncio
@@ -14,6 +16,8 @@ import hashlib
 import logging
 import re
 import time
+
+from sqlmodel import select
 
 from .base import LogSource
 from .storage import JsonlStorage
@@ -48,30 +52,53 @@ class LogProcessor:
         self.digest_interval = digest_interval
         self.max_signatures = max_signatures
         self.lang = lang
+        # In-memory cache of {sig: {source, sample, first_seen, since_digest, total}}.
+        # The `since_digest` counter is per-process and intentionally NOT persisted —
+        # restart starts a fresh digest window. `first_seen`/`total` mirror DB.
         self._sigs: dict[str, dict] = {}
 
     async def run(self) -> None:
         if not self.sources:
             log.warning("logs: no sources configured")
             return
+        await self._hydrate_from_db()
         log.info(
-            "logs: %d sources, digest every %.0fs, storage at %s",
-            len(self.sources), self.digest_interval, self.storage.path,
+            "logs: %d sources, digest every %.0fs, storage at %s, sigs cached %d",
+            len(self.sources), self.digest_interval, self.storage.path, len(self._sigs),
         )
         tasks = [self._consume(s) for s in self.sources]
         tasks.append(self._digest_loop())
         await asyncio.gather(*tasks)
+
+    async def _hydrate_from_db(self) -> None:
+        from services.db.models import LogSignatureEntry
+        from services.taskiq.broker import broker
+
+        session_maker = broker.state.data.get("db_session_maker")
+        if session_maker is None:
+            log.warning("logs: db not initialized, signatures will not persist")
+            return
+        async with session_maker() as session:
+            rows = (await session.exec(select(LogSignatureEntry))).all()
+        for row in rows:
+            self._sigs[row.sig] = {
+                "source": row.source,
+                "sample": row.sample,
+                "first_seen": row.first_seen,
+                "since_digest": 0,
+                "total": row.total,
+            }
 
     async def _consume(self, source: LogSource) -> None:
         try:
             async for line in source.stream():
                 if not line:
                     continue
-                self._record(source.name, line)
+                await self._record(source.name, line)
         except Exception:
             log.exception("logs: source %s crashed", source.name)
 
-    def _record(self, source_name: str, line: str) -> None:
+    async def _record(self, source_name: str, line: str) -> None:
         sig = _signature(line)
         now = time.time()
         first = sig not in self._sigs
@@ -98,8 +125,34 @@ class LogProcessor:
         except Exception:
             log.exception("logs: storage append failed")
 
+        await self._persist_sig(sig, source_name, line, now, self._sigs[sig]["total"], first)
+
         if first:
             asyncio.create_task(self._kick_first(source_name, line))
+
+    async def _persist_sig(
+        self, sig: str, source: str, sample: str, ts: float, total: int, first: bool,
+    ) -> None:
+        from services.db.models import LogSignatureEntry
+        from services.taskiq.broker import broker
+
+        session_maker = broker.state.data.get("db_session_maker")
+        if session_maker is None:
+            return
+        try:
+            async with session_maker() as session:
+                row = await session.get(LogSignatureEntry, sig)
+                if row is None:
+                    session.add(LogSignatureEntry(
+                        sig=sig, source=source, sample=sample,
+                        first_seen=ts, total=total,
+                    ))
+                else:
+                    row.total = total
+                    session.add(row)
+                await session.commit()
+        except Exception:
+            log.exception("logs: failed to persist signature %s (first=%s)", sig, first)
 
     def _evict_if_needed(self) -> None:
         if len(self._sigs) < self.max_signatures:

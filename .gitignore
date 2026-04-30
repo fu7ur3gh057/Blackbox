@@ -8,5 +8,6 @@ config.yaml
 config.yaml.bak
 .env
 /logs/
+/data/
 .idea/
 .vscode/

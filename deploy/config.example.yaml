@@ -99,6 +99,12 @@ logs:
   #     label: "Goda DLQ"
   #     warn_above: 1
 
+# SQLite database — survives restarts: alert state per check, history of
+# check results, fired alerts and log signature dedup. Single file, no
+# external service. The daemon creates the parent dir automatically.
+db:
+  path: data/blackbox.sqlite
+
 # FastAPI web client — opt-in via the daemon's --web flag or `enabled: true`.
 # After start the daemon prints the full URL to journal:
 #   http://<vps-ip>:8765/blackbox/api/docs

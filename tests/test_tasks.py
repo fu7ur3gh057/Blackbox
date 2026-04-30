@@ -1,14 +1,15 @@
 """Task-level integration: run_check, send_alert, build_and_send_report,
-notify_log_first/digest. We use the shared broker fixture and inject a
-hand-rolled AppContext to keep tests hermetic."""
+notify_log_first/digest. Uses the broker fixture (which also brings up
+SQLite); state and history live in the DB now, so assertions read back
+through the same session_maker."""
 
-from collections import namedtuple
+from sqlmodel import select
 
 from core.checks.base import Result
 from core.config import Config
 from core.notifiers import Alert
 from core.report.sections.base import Section, SectionResult
-from core.state import StateTracker
+from services.db.models import AlertEvent, CheckResult, CheckStateEntry
 from services.taskiq.context import AppContext
 
 
@@ -23,8 +24,6 @@ class FakeNotifier:
         self.texts: list[str] = []
         self.log_firsts: list[tuple[str, str]] = []
         self.log_digests: list[tuple[list, str]] = []
-        self.startups = 0
-        self.shutdowns = 0
 
     async def send(self, alert: Alert) -> None:
         self.alerts.append(alert)
@@ -32,11 +31,8 @@ class FakeNotifier:
     async def send_text(self, text: str) -> None:
         self.texts.append(text)
 
-    async def send_startup(self) -> None:
-        self.startups += 1
-
-    async def send_shutdown(self) -> None:
-        self.shutdowns += 1
+    async def send_startup(self) -> None: ...
+    async def send_shutdown(self) -> None: ...
 
     async def send_log_first(self, source: str, sample: str) -> None:
         self.log_firsts.append((source, sample))
@@ -65,9 +61,25 @@ class FakeSection(Section):
         return SectionResult(text=self.text, warnings=self.warnings)
 
 
+async def _read_state(broker, name: str) -> str | None:
+    async with broker.state.db_session_maker() as session:
+        row = await session.get(CheckStateEntry, name)
+        return row.level if row else None
+
+
+async def _all_results(broker) -> list[CheckResult]:
+    async with broker.state.db_session_maker() as session:
+        return list((await session.exec(select(CheckResult))).all())
+
+
+async def _all_alerts(broker) -> list[AlertEvent]:
+    async with broker.state.db_session_maker() as session:
+        return list((await session.exec(select(AlertEvent))).all())
+
+
 # ── run_check ──────────────────────────────────────────────────────────────
 
-async def test_run_check_warn_dispatches_alert(broker):
+async def test_run_check_warn_dispatches_alert_and_persists(broker):
     notifier = FakeNotifier()
     ctx = AppContext(
         config=Config(checks=[], notifiers=[]),
@@ -80,14 +92,18 @@ async def test_run_check_warn_dispatches_alert(broker):
     from tasks.checks import run_check
     res = await (await run_check.kiq("cpu")).wait_result()
     assert not res.is_err
-    assert ctx.tracker._levels == {"cpu": "warn"}
-    # send_alert ran inline (InMemoryBroker), notifier should have received it
+
+    assert await _read_state(broker, "cpu") == "warn"
+    [row] = await _all_results(broker)
+    assert row.name == "cpu" and row.level == "warn"
+    [alert_row] = await _all_alerts(broker)
+    assert alert_row.level == "warn"
+
     assert len(notifier.alerts) == 1
     assert notifier.alerts[0].level == "warn"
-    assert notifier.alerts[0].kind == "cpu"
 
 
-async def test_run_check_steady_ok_does_not_fire(broker):
+async def test_run_check_steady_ok_persists_results_but_no_alerts(broker):
     notifier = FakeNotifier()
     ctx = AppContext(
         config=Config(checks=[], notifiers=[]),
@@ -99,7 +115,11 @@ async def test_run_check_steady_ok_does_not_fire(broker):
     from tasks.checks import run_check
     await (await run_check.kiq("cpu")).wait_result()
     await (await run_check.kiq("cpu")).wait_result()
+
     assert notifier.alerts == []
+    assert await _read_state(broker, "cpu") == "ok"
+    assert len(await _all_results(broker)) == 2  # both ok results stored
+    assert await _all_alerts(broker) == []
 
 
 async def test_run_check_recovery_fires_ok(broker):
@@ -120,6 +140,27 @@ async def test_run_check_recovery_fires_ok(broker):
     await (await run_check.kiq("cpu")).wait_result()
 
     assert [a.level for a in notifier.alerts] == ["crit", "ok"]
+    assert await _read_state(broker, "cpu") == "ok"
+
+
+async def test_run_check_state_survives_restart_simulation(broker):
+    """The state table is the source of truth — once written, a fresh task
+    invocation should see the prior level and stay quiet on a steady reading."""
+    notifier = FakeNotifier()
+    ctx = AppContext(
+        config=Config(checks=[], notifiers=[]),
+        checks_by_name={"cpu": FakeCheck("cpu", Result(level="warn", kind="cpu",
+                                                      detail="warn"))},
+        notifiers=[notifier],
+    )
+    broker.state.app_ctx = ctx
+
+    from tasks.checks import run_check
+    await (await run_check.kiq("cpu")).wait_result()
+    notifier.alerts.clear()
+    await (await run_check.kiq("cpu")).wait_result()
+    # Same level, second invocation should NOT re-alert.
+    assert notifier.alerts == []
 
 
 async def test_run_check_unknown_name_is_silent(broker):
@@ -135,6 +176,7 @@ async def test_run_check_unknown_name_is_silent(broker):
     res = await (await run_check.kiq("nonexistent")).wait_result()
     assert not res.is_err
     assert notifier.alerts == []
+    assert await _all_results(broker) == []
 
 
 async def test_run_check_crashed_handler_is_reported_as_crit(broker):
@@ -158,11 +200,12 @@ async def test_run_check_crashed_handler_is_reported_as_crit(broker):
     [alert] = notifier.alerts
     assert alert.level == "crit"
     assert "kaboom" in alert.detail
+    assert await _read_state(broker, "boom") == "crit"
 
 
 # ── send_alert ─────────────────────────────────────────────────────────────
 
-async def test_send_alert_broadcasts_to_all_notifiers(broker):
+async def test_send_alert_broadcasts_and_persists(broker):
     n1, n2 = FakeNotifier(), FakeNotifier()
     ctx = AppContext(
         config=Config(checks=[], notifiers=[]),
@@ -176,6 +219,8 @@ async def test_send_alert_broadcasts_to_all_notifiers(broker):
 
     assert n1.alerts == [alert]
     assert n2.alerts == [alert]
+    [stored] = await _all_alerts(broker)
+    assert stored.name == "cpu" and stored.level == "warn"
 
 
 async def test_send_alert_one_failing_notifier_does_not_block_others(broker):

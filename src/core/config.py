@@ -25,6 +25,7 @@ class Config:
     report: dict | None = None
     logs: dict | None = None
     web: dict | None = None
+    db: dict | None = None
 
 
 def load_config(path: Path) -> Config:
@@ -48,4 +49,5 @@ def load_config(path: Path) -> Config:
         report=raw.get("report"),
         logs=raw.get("logs"),
         web=raw.get("web"),
+        db=raw.get("db"),
     )

@@ -1,24 +1,31 @@
 """Broker startup/shutdown wiring.
 
 `init_broker` builds the AppContext from a loaded Config, attaches it to
-broker.state, and starts the broker. `shutdown_broker` is the symmetric
-cleanup. Both are idempotent enough that calling shutdown without a prior
-startup is harmless.
+broker.state, brings up the SQLite engine, and starts the broker.
+`shutdown_broker` is the symmetric cleanup. Both are idempotent enough
+that calling shutdown without a prior startup is harmless.
 """
 
 import logging
+from pathlib import Path
 
 from core.checks import build_check
 from core.config import Config
 from core.notifiers import build_notifier
 from core.report import build_report_context
+from services.db.lifetime import init_db, shutdown_db
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 
 log = logging.getLogger(__name__)
 
+_DEFAULT_DB_PATH = "data/blackbox.sqlite"
+
 
 async def init_broker(config: Config) -> AppContext:
+    db_path = Path((config.db or {}).get("path", _DEFAULT_DB_PATH))
+    await init_db(db_path)
+
     notifiers_by_type = {n.type: build_notifier(n) for n in config.notifiers}
     notifiers = list(notifiers_by_type.values())
 
@@ -58,3 +65,4 @@ async def shutdown_broker() -> None:
         await broker.shutdown()
     except Exception:
         log.exception("broker shutdown failed")
+    await shutdown_db()
