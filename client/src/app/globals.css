@@ -101,16 +101,21 @@ body::after {
 }
 .pulse-green { animation: pulse-dot 2s ease-out infinite; }
 
+@keyframes pulse-dot-crit {
+  0%   { box-shadow: 0 0 0 0   rgba(252,165,165, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(252,165,165, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(252,165,165, 0); }
+}
+.pulse-crit { animation: pulse-dot-crit 1.5s ease-out infinite; }
+
+/* Pure fade — clean and deliberate, no blur/scale */
 @keyframes reveal-in {
-  0%   { opacity: 0; transform: translateY(20px) scale(0.96); filter: blur(14px) brightness(0.4); }
-  20%  { opacity: 0.30; filter: blur(12px) brightness(0.55); }
-  45%  { opacity: 0.65; filter: blur(7px)  brightness(0.78); }
-  75%  { opacity: 0.95; filter: blur(2px)  brightness(0.95); }
-  100% { opacity: 1;    transform: translateY(0) scale(1); filter: blur(0) brightness(1); }
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
 }
 .reveal {
   opacity: 0;
-  animation: reveal-in 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: reveal-in 1.0s ease-out forwards;
 }
 
 @keyframes blink {
