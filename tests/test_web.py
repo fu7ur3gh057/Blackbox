@@ -1,20 +1,44 @@
-"""FastAPI app: factory, health and status endpoints, CORS."""
+"""FastAPI app: factory, prefix, endpoints, CORS."""
 
 from fastapi.testclient import TestClient
 
-from web.application import get_app
+from web.application import DEFAULT_PREFIX, get_app
 
 
-def test_health_endpoint():
+# ── default prefix (/blackbox) ─────────────────────────────────────────────
+
+def test_default_prefix_is_blackbox():
+    """Without args, the factory uses DEFAULT_PREFIX so a fresh deploy
+    gets `/blackbox/...` URLs out of the box."""
     app = get_app()
     with TestClient(app) as client:
-        r = client.get("/health")
+        r = client.get(f"{DEFAULT_PREFIX}/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
 
 
-def test_status_endpoint():
+def test_root_health_404_when_prefix_set():
+    """/health without the prefix shouldn't resolve when a prefix is in play
+    — guards against accidentally double-mounting."""
     app = get_app()
+    with TestClient(app) as client:
+        r = client.get("/health")
+    assert r.status_code == 404
+
+
+# ── empty-prefix mode (legacy / behind path-stripping proxy) ───────────────
+
+def test_empty_prefix_mode():
+    app = get_app(prefix="")
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/api/status").status_code == 200
+
+
+# ── routes & openapi ───────────────────────────────────────────────────────
+
+def test_status_endpoint():
+    app = get_app(prefix="")
     with TestClient(app) as client:
         r = client.get("/api/status")
     assert r.status_code == 200
@@ -23,17 +47,42 @@ def test_status_endpoint():
     assert "version" in body
 
 
-def test_openapi_schema_available():
-    app = get_app()
+def test_openapi_schema_lists_prefixed_paths():
+    app = get_app(prefix="/blackbox")
     with TestClient(app) as client:
-        r = client.get("/api/openapi.json")
+        r = client.get("/blackbox/api/openapi.json")
     assert r.status_code == 200
     schema = r.json()
-    assert "/api/status" in schema["paths"]
+    assert "/blackbox/api/status" in schema["paths"]
 
+
+def test_swagger_html_served_at_prefix():
+    app = get_app(prefix="/blackbox")
+    with TestClient(app) as client:
+        r = client.get("/blackbox/api/docs")
+    assert r.status_code == 200
+    assert "swagger" in r.text.lower()
+
+
+def test_env_var_drives_prefix_when_arg_omitted(monkeypatch):
+    monkeypatch.setenv("BLACKBOX_WEB_PREFIX", "/custom")
+    app = get_app()
+    with TestClient(app) as client:
+        assert client.get("/custom/health").status_code == 200
+        assert client.get("/blackbox/health").status_code == 404
+
+
+def test_explicit_prefix_overrides_env(monkeypatch):
+    monkeypatch.setenv("BLACKBOX_WEB_PREFIX", "/custom")
+    app = get_app(prefix="/blackbox")
+    with TestClient(app) as client:
+        assert client.get("/blackbox/health").status_code == 200
+
+
+# ── CORS ──────────────────────────────────────────────────────────────────
 
 def test_cors_allows_nextjs_dev_origin():
-    app = get_app()
+    app = get_app(prefix="")
     with TestClient(app) as client:
         r = client.options(
             "/api/status",
@@ -46,7 +95,7 @@ def test_cors_allows_nextjs_dev_origin():
 
 
 def test_cors_rejects_unknown_origin():
-    app = get_app()
+    app = get_app(prefix="")
     with TestClient(app) as client:
         r = client.options(
             "/api/status",

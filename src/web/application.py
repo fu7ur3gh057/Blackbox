@@ -1,24 +1,36 @@
-"""FastAPI factory for the BlackBox web client."""
+"""FastAPI factory for the BlackBox web client.
+
+The path prefix (default `/blackbox`) makes the API self-contained behind
+any reverse proxy or direct port access — same URL shape works in both
+cases. Override via env BLACKBOX_WEB_PREFIX before instantiating.
+"""
+
+import os
 
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from web.lifetime import lifespan
 from web.apis import api_router
+from web.lifetime import lifespan
 
-
-# Default to Next.js dev server. In prod (behind SSH tunnel) CORS is moot —
-# the request lands on localhost from the user's own browser.
+# Default to Next.js dev server. In prod (behind SSH tunnel or direct port)
+# CORS is moot — the browser hits the same origin once it's reachable.
 _DEFAULT_CORS = ["http://localhost:3000", "http://127.0.0.1:3000"]
 
+DEFAULT_PREFIX = "/blackbox"
 
-def get_app() -> FastAPI:
+
+def get_app(prefix: str | None = None) -> FastAPI:
+    if prefix is None:
+        prefix = os.environ.get("BLACKBOX_WEB_PREFIX", DEFAULT_PREFIX)
+    prefix = prefix.rstrip("/")  # "/blackbox" or "" for no-prefix
+
     application = FastAPI(
         title="BlackBox",
         version="0.1.0",
-        docs_url="/api/docs",
-        redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        docs_url=f"{prefix}/api/docs",
+        redoc_url=f"{prefix}/api/redoc",
+        openapi_url=f"{prefix}/api/openapi.json",
         lifespan=lifespan,
     )
 
@@ -30,9 +42,9 @@ def get_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    application.include_router(api_router, prefix="/api")
+    application.include_router(api_router, prefix=f"{prefix}/api")
 
-    @application.get("/health", include_in_schema=False)
+    @application.get(f"{prefix}/health", include_in_schema=False)
     async def _health() -> dict[str, str]:
         return {"status": "ok"}
 

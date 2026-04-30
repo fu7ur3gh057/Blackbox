@@ -68,7 +68,7 @@ async def _run(config: Config, *, web_enabled: bool) -> None:
             coros.append(log_processor.run())
 
     if web_enabled:
-        coros.append(_run_web())
+        coros.append(_run_web(config))
 
     if not coros:
         log.warning("nothing to run, exiting")
@@ -105,16 +105,35 @@ async def _run(config: Config, *, web_enabled: bool) -> None:
         await shutdown_broker()
 
 
-async def _run_web() -> None:
+async def _run_web(config: Config) -> None:
     """Embed uvicorn in the current event loop so the broker (and AppContext)
-    is shared between scheduler tasks and HTTP handlers."""
+    is shared between scheduler tasks and HTTP handlers.
+
+    Bind/port/prefix come from `web:` in config.yaml, with env overrides
+    BLACKBOX_WEB_{HOST,PORT,PREFIX}. Defaults: 0.0.0.0:8765/blackbox so the
+    user can hit `http://<vps-ip>:8765/blackbox/api/docs` immediately."""
     import os
 
     import uvicorn
 
-    host = os.environ.get("BLACKBOX_WEB_HOST", "127.0.0.1")
-    port = int(os.environ.get("BLACKBOX_WEB_PORT", "8765"))
-    config = uvicorn.Config(
+    web_cfg = config.web or {}
+    host = os.environ.get("BLACKBOX_WEB_HOST") or web_cfg.get("host", "0.0.0.0")
+    port = int(os.environ.get("BLACKBOX_WEB_PORT") or web_cfg.get("port", 8765))
+    prefix = (os.environ.get("BLACKBOX_WEB_PREFIX")
+              or web_cfg.get("prefix", "/blackbox")).rstrip("/")
+
+    # The factory reads BLACKBOX_WEB_PREFIX at call time; set it explicitly
+    # so a value coming from config.yaml propagates.
+    os.environ["BLACKBOX_WEB_PREFIX"] = prefix
+
+    log = logging.getLogger(__name__)
+    public_ip = await _detect_public_ip()
+    visible_host = public_ip or (host if host != "0.0.0.0" else "<vps-ip>")
+    log.info("web: http://%s:%d%s/api/docs (Swagger)", visible_host, port, prefix or "")
+    log.info("web: http://%s:%d%s/api/redoc", visible_host, port, prefix or "")
+    log.info("web: http://%s:%d%s/health (healthcheck)", visible_host, port, prefix or "")
+
+    cfg = uvicorn.Config(
         "web.application:get_app",
         factory=True,
         host=host,
@@ -122,10 +141,34 @@ async def _run_web() -> None:
         log_level="info",
         lifespan="on",
     )
-    server = uvicorn.Server(config)
+    server = uvicorn.Server(cfg)
     # Suppress uvicorn's own signal handlers — main owns SIGINT/SIGTERM.
     server.install_signal_handlers = lambda: None  # type: ignore[method-assign]
     await server.serve()
+
+
+async def _detect_public_ip() -> str | None:
+    """Best-effort: ipify gives the egress IP, then a UDP-trick local IP."""
+    import socket
+
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=3) as client:
+            r = await client.get("https://api.ipify.org")
+        if r.status_code == 200 and r.text.strip():
+            return r.text.strip()
+    except Exception:
+        pass
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
 
 
 def _set_if_pending(fut: asyncio.Future, value: str) -> None:

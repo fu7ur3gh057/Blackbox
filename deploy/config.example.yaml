@@ -98,3 +98,13 @@ logs:
   #     query: "SELECT count(*) FROM dlq_messages"
   #     label: "Goda DLQ"
   #     warn_above: 1
+
+# FastAPI web client — opt-in via the daemon's --web flag or `enabled: true`.
+# After start the daemon prints the full URL to journal:
+#   http://<vps-ip>:8765/blackbox/api/docs
+# Override host/port/prefix here or via env BLACKBOX_WEB_{HOST,PORT,PREFIX}.
+web:
+  enabled: false               # also turns on automatically with `python -m main --web`
+  host: 0.0.0.0                # listen on all interfaces (LAN + WAN)
+  port: 8765
+  prefix: /blackbox            # URL prefix; "" disables prefixing
