@@ -10,30 +10,35 @@ import { Statistics } from "@/components/widgets/statistics";
 import { WatchCards } from "@/components/widgets/watch-cards";
 
 /**
- * Each widget is wrapped in <Reveal delay /> so the dashboard "boots up"
- * staggered, terminal-style. Delays span ~3.5s — the boot sequence
- * deliberately reads like a system loading screen, every panel
- * un-blurs in turn instead of all popping at once.
+ * Top row: Statistics on the left (8/12 on lg, 9/12 on xl) with a
+ * narrow sidebar (Recent + Healthy) on the right of the main content
+ * area. Below the row everything stays full-width.
+ *
+ * Each widget is wrapped in <Reveal delay /> for a staggered fade-in
+ * after auth.
  */
 export default function Dashboard() {
   return (
     <div className="space-y-5 max-w-[1400px]">
-      <Reveal delay={0}><Statistics /></Reveal>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Reveal delay={500}><RecentChecks /></Reveal>
-        <Reveal delay={750}><HealthyList /></Reveal>
+      <div className="grid grid-cols-12 gap-5">
+        <div className="col-span-12 lg:col-span-8 xl:col-span-9">
+          <Reveal delay={0}><Statistics /></Reveal>
+        </div>
+        <div className="col-span-12 lg:col-span-4 xl:col-span-3 space-y-5">
+          <Reveal delay={300}><RecentChecks /></Reveal>
+          <Reveal delay={550}><HealthyList /></Reveal>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        <Reveal delay={1000}><GaugeMeter /></Reveal>
-        <Reveal delay={1250}><PixelGrid /></Reveal>
-        <Reveal delay={1500}><Heartbeat /></Reveal>
-        <Reveal delay={1750}><NodeWeb /></Reveal>
+        <Reveal delay={800}><GaugeMeter /></Reveal>
+        <Reveal delay={1000}><PixelGrid /></Reveal>
+        <Reveal delay={1200}><Heartbeat /></Reveal>
+        <Reveal delay={1400}><NodeWeb /></Reveal>
       </div>
 
-      <Reveal delay={2050}><WatchCards /></Reveal>
-      <Reveal delay={2350}><ServerLocation /></Reveal>
+      <Reveal delay={1700}><WatchCards /></Reveal>
+      <Reveal delay={2000}><ServerLocation /></Reveal>
     </div>
   );
 }

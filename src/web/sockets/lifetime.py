@@ -35,9 +35,16 @@ def init_socketio(
     prefix: str = "",
     cors_origins: list[str] | None = None,
 ) -> AsyncServer:
+    # Socket.IO does its own Origin check before the WebSocket upgrade and
+    # uses an exact-match list — that means same-origin requests from the
+    # served bundle (e.g. localhost:8765 hitting localhost:8765) get
+    # rejected if the explicit list doesn't include them. We can't
+    # enumerate every host the daemon might be reached on, so accept any
+    # Origin here and lean on JWT auth in AuthedNamespace.on_connect for
+    # actual access control.
     server = AsyncServer(
         async_mode="asgi",
-        cors_allowed_origins=cors_origins or [],
+        cors_allowed_origins="*",
     )
     server.register_namespace(AlertsNamespace("/alerts"))
     server.register_namespace(ChecksNamespace("/checks"))
