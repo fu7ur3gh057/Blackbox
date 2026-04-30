@@ -73,3 +73,55 @@ body::before {
   100% { box-shadow: 0 0 0 0   rgba(196, 181, 253, 0); }
 }
 .pulse-lavender { animation: pulse-dot 2s ease-out infinite; }
+
+/* ── widget-specific animations ──────────────────────────────────────── */
+
+/* Pixel-grid cells light up sequentially when the widget mounts. */
+@keyframes pixel-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.pixel-cell { animation: pixel-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* Brighter pulse on the cell representing "now" */
+@keyframes pixel-now {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 181, 253, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(196, 181, 253, 0.35); }
+}
+.pixel-now { animation: pixel-now 1.8s ease-in-out infinite; }
+
+/* ECG line scrolls continuously left */
+@keyframes ecg-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-800px); }
+}
+.ecg-scroll { animation: ecg-scroll 5s linear infinite; }
+
+/* A short bright flash that travels across the heartbeat sweep */
+@keyframes ecg-glow-pulse {
+  0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 6px rgba(196,181,253,0.4)); }
+  50%      { opacity: 1;   filter: drop-shadow(0 0 14px rgba(196,181,253,0.85)); }
+}
+.ecg-glow { animation: ecg-glow-pulse 2.4s ease-in-out infinite; }
+
+/* Gauge needle eases into its new angle */
+.gauge-needle { transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* Drifting/floating node motion for the orbital web */
+@keyframes float-orbit {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(0, -4px); }
+}
+
+/* Soft pulsing ring around an orbital node */
+@keyframes node-ring {
+  0%   { transform: scale(0.9); opacity: 0.55; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* Gauge tick "alive" — rotating subtle gradient on the dial */
+@keyframes dial-shimmer {
+  0%   { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -200; }
+}
