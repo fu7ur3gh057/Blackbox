@@ -63,12 +63,23 @@ client-install: ensure-node
 client-dev: ensure-node
 	@$(PKG_LOOKUP); cd $(CLIENT_DIR) && $$PKG run dev
 
-# `client-build` now also installs deps when node_modules is missing — so
-# a fresh checkout only needs `make client-build` (not -install + -build).
+# `client-build` syncs deps automatically — both when node_modules is
+# missing AND when package.json / package-lock.json have been touched
+# more recently (e.g. `git pull` brought in new dependencies). Without
+# the second check, `make client-build` after a pull silently builds
+# against stale node_modules and fails with "Can't resolve …" errors.
 client-build: ensure-node
 	@$(PKG_LOOKUP); \
-	if [ ! -d $(CLIENT_DIR)/node_modules ]; then \
-		echo "  node_modules missing — installing first..."; \
+	NM=$(CLIENT_DIR)/node_modules; \
+	PJ=$(CLIENT_DIR)/package.json; \
+	PL=$(CLIENT_DIR)/package-lock.json; \
+	NEEDS_INSTALL=0; \
+	if [ ! -d $$NM ]; then NEEDS_INSTALL=1; \
+	elif [ $$PJ -nt $$NM ]; then NEEDS_INSTALL=1; \
+	elif [ -f $$PL ] && [ $$PL -nt $$NM ]; then NEEDS_INSTALL=1; \
+	fi; \
+	if [ $$NEEDS_INSTALL = 1 ]; then \
+		echo "  dependencies out of sync — running $$PKG install..."; \
 		cd $(CLIENT_DIR) && $$PKG install; cd ..; \
 	fi; \
 	cd $(CLIENT_DIR) && $$PKG run build
