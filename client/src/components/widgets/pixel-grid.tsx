@@ -64,7 +64,7 @@ export function PixelGrid() {
                 className={cn(
                   "pixel-cell aspect-square rounded-md transition-colors",
                   cls,
-                  isNow && "pixel-now ring-1 ring-accent-lavender/40",
+                  isNow && "pixel-now ring-1 ring-accent-green/40",
                 )}
                 style={{ animationDelay: `${i * 35}ms` }}
               />
@@ -77,12 +77,12 @@ export function PixelGrid() {
           <span className="uppercase tracking-wider">24h ago</span>
           <div className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-sm bg-white/[0.04]" />
-            <span className="h-2 w-2 rounded-sm bg-accent-lavender/30" />
-            <span className="h-2 w-2 rounded-sm bg-accent-lavender/60" />
-            <span className="h-2 w-2 rounded-sm bg-accent-pink/70" />
+            <span className="h-2 w-2 rounded-sm bg-accent-green/30" />
+            <span className="h-2 w-2 rounded-sm bg-accent-green/60" />
+            <span className="h-2 w-2 rounded-sm bg-accent-bright/70" />
             <span className="h-2 w-2 rounded-sm bg-level-crit/80" />
           </div>
-          <span className="uppercase tracking-wider text-accent-lavender">now</span>
+          <span className="uppercase tracking-wider text-accent-green">now</span>
         </div>
       </PanelBody>
     </Panel>
@@ -92,7 +92,7 @@ export function PixelGrid() {
 function pickClass(count: number, hasCrit: boolean): string {
   if (count === 0) return "bg-white/[0.035] border border-white/[0.04]";
   if (hasCrit) return "bg-level-crit/70 shadow-[0_0_12px_rgba(252,165,165,0.45)]";
-  if (count >= 6) return "bg-accent-pink/70 shadow-[0_0_12px_rgba(240,171,252,0.4)]";
-  if (count >= 3) return "bg-accent-lavender/60 shadow-[0_0_10px_rgba(196,181,253,0.4)]";
-  return "bg-accent-lavender/30";
+  if (count >= 6) return "bg-accent-bright/70 shadow-[0_0_12px_rgba(255,255,255,0.4)]";
+  if (count >= 3) return "bg-accent-green/60 shadow-[0_0_10px_rgba(34,255,102,0.4)]";
+  return "bg-accent-green/30";
 }

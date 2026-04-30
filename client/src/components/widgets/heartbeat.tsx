@@ -54,10 +54,10 @@ export function Heartbeat() {
       <PanelHeader className="pb-1">
         <div className="flex items-center justify-between">
           <PanelTitle className="text-[13px] flex items-center gap-2">
-            <Activity size={13} className="text-accent-lavender" /> System pulse
+            <Activity size={13} className="text-accent-green" /> System pulse
           </PanelTitle>
           <span className="text-[11px] text-ink-mute tabular-nums">
-            <span className="text-accent-lavender font-semibold text-[13px]">{bpm}</span> bpm
+            <span className="text-accent-green font-semibold text-[13px]">{bpm}</span> bpm
           </span>
         </div>
       </PanelHeader>
@@ -81,13 +81,13 @@ export function Heartbeat() {
           <svg viewBox="0 0 800 100" className="w-full h-full" preserveAspectRatio="none">
             <defs>
               <linearGradient id="ecg-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"  stopColor="#A78BFA" stopOpacity="0.4" />
-                <stop offset="50%" stopColor="#A78BFA" stopOpacity="1" />
-                <stop offset="100%" stopColor="#F0ABFC" stopOpacity="1" />
+                <stop offset="0%"  stopColor="#22FF66" stopOpacity="0.4" />
+                <stop offset="50%" stopColor="#22FF66" stopOpacity="1" />
+                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
               </linearGradient>
               <linearGradient id="ecg-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="#A78BFA" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="#A78BFA" stopOpacity="0" />
+                <stop offset="0%"   stopColor="#22FF66" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#22FF66" stopOpacity="0" />
               </linearGradient>
             </defs>
 
@@ -120,7 +120,7 @@ export function Heartbeat() {
             </g>
 
             {/* leading dot — the "current" position of the trace */}
-            <circle cx="700" cy="50" r="3" fill="#F0ABFC">
+            <circle cx="700" cy="50" r="3" fill="#FFFFFF">
               <animate attributeName="r" values="3;5;3" dur="0.8s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="1;0.5;1" dur="0.8s" repeatCount="indefinite" />
             </circle>

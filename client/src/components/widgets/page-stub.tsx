@@ -12,7 +12,7 @@ export function PageStub({ Icon, title, blurb, bullets }: PageStubProps) {
   return (
     <Panel className="max-w-[1100px]">
       <PanelHeader className="flex items-center gap-3 pb-1">
-        <div className="h-9 w-9 rounded-xl bg-accent-lavender/12 text-accent-lavender flex items-center justify-center">
+        <div className="h-9 w-9 rounded-xl bg-accent-green/12 text-accent-green flex items-center justify-center">
           <Icon size={16} strokeWidth={1.8} />
         </div>
         <PanelTitle className="text-[16px]">{title}</PanelTitle>
@@ -22,7 +22,7 @@ export function PageStub({ Icon, title, blurb, bullets }: PageStubProps) {
         <ul className="mt-5 space-y-2">
           {bullets.map((b, i) => (
             <li key={i} className="flex items-start gap-2 text-[12.5px] text-ink-dim">
-              <span className="mt-1.5 h-1 w-1 rounded-full bg-accent-lavender shrink-0" />
+              <span className="mt-1.5 h-1 w-1 rounded-full bg-accent-green shrink-0" />
               <span>{b}</span>
             </li>
           ))}

@@ -36,7 +36,7 @@ export function WatchCards() {
     <Panel>
       <PanelHeader className="flex items-center justify-between pb-2">
         <PanelTitle className="flex items-center gap-2">
-          <Boxes size={14} className="text-accent-lavender" /> Ongoing services
+          <Boxes size={14} className="text-accent-green" /> Ongoing services
         </PanelTitle>
         <span className="text-[10px] text-ink-mute">{data.length} project{data.length === 1 ? "" : "s"}</span>
       </PanelHeader>
@@ -56,7 +56,7 @@ export function WatchCards() {
               <div key={p.compose} className="rounded-card bg-canvas-elev2/70 border border-white/[0.04] p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 rounded-full bg-gradient-to-br from-accent-lavender/40 to-accent-pink/40 border border-white/15 flex items-center justify-center text-[11px] font-bold text-canvas">
+                    <div className="h-7 w-7 rounded-full bg-gradient-to-br from-accent-green/40 to-accent-bright/40 border border-white/15 flex items-center justify-center text-[11px] font-bold text-canvas">
                       {p.project[0]?.toUpperCase() ?? "?"}
                     </div>
                     <div className="leading-tight min-w-0">

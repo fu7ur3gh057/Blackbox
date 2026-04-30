@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 
 const LEVEL: Record<Level, { fill: string; ring: string; glow: string }> = {
-  ok:   { fill: "#A78BFA", ring: "rgba(167,139,250,0.55)",  glow: "drop-shadow(0 0 14px rgba(167,139,250,0.55))" },
+  ok:   { fill: "#22FF66", ring: "rgba(34,255,102,0.55)",  glow: "drop-shadow(0 0 14px rgba(34,255,102,0.55))" },
   warn: { fill: "#FDE68A", ring: "rgba(253,230,138,0.55)",  glow: "drop-shadow(0 0 14px rgba(253,230,138,0.55))" },
   crit: { fill: "#FCA5A5", ring: "rgba(252,165,165,0.65)",  glow: "drop-shadow(0 0 16px rgba(252,165,165,0.65))" },
 };
@@ -51,12 +51,12 @@ export function NodeWeb() {
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 200">
             <defs>
               <radialGradient id="orbit-bg" cx="50%" cy="50%" r="50%">
-                <stop offset="0%"   stopColor="rgba(167,139,250,0.10)" />
+                <stop offset="0%"   stopColor="rgba(34,255,102,0.10)" />
                 <stop offset="100%" stopColor="transparent" />
               </radialGradient>
               <linearGradient id="orbit-line" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"   stopColor="rgba(196,181,253,0.45)" />
-                <stop offset="100%" stopColor="rgba(196,181,253,0.05)" />
+                <stop offset="0%"   stopColor="rgba(34,255,102,0.45)" />
+                <stop offset="100%" stopColor="rgba(34,255,102,0.05)" />
               </linearGradient>
             </defs>
 
@@ -84,11 +84,11 @@ export function NodeWeb() {
 
           {/* central blackbox node */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-accent-lavender to-accent-pink flex items-center justify-center text-[14px] font-bold text-canvas shadow-chip">
+            <div className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-accent-green to-accent-bright flex items-center justify-center text-[14px] font-bold text-canvas shadow-chip">
               b
               <span
                 className="absolute inset-0 rounded-2xl"
-                style={{ animation: "node-ring 2.4s ease-out infinite", border: "2px solid rgba(196,181,253,0.45)" }}
+                style={{ animation: "node-ring 2.4s ease-out infinite", border: "2px solid rgba(34,255,102,0.45)" }}
               />
             </div>
           </div>

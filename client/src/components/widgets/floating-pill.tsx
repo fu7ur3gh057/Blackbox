@@ -27,7 +27,7 @@ export function FloatingPill() {
 
   return (
     <div className="fixed bottom-7 right-7 z-30 pointer-events-none">
-      <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-accent-lavender pl-3 pr-4 py-2 shadow-chip">
+      <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-accent-green pl-3 pr-4 py-2 shadow-chip">
         <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
           <ArrowUpRight size={14} className="text-white" strokeWidth={2.5} />
         </div>

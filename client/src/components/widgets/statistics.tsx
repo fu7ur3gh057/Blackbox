@@ -23,8 +23,8 @@ const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
   { key: "both",   label: "Both" },
 ];
 
-const CPU_COLOR = "#A78BFA";
-const MEM_COLOR = "#F0ABFC";
+const CPU_COLOR = "#22FF66";
+const MEM_COLOR = "#FFFFFF";
 
 export function Statistics() {
   const [range, setRange] = useState<Range>("Days");
@@ -161,10 +161,10 @@ export function Statistics() {
                 width={36}
               />
               <Tooltip
-                cursor={{ stroke: "rgba(196,181,253,0.30)", strokeDasharray: "3 3" }}
+                cursor={{ stroke: "rgba(34,255,102,0.30)", strokeDasharray: "3 3" }}
                 contentStyle={{
                   background: "rgba(20,22,30,0.95)",
-                  border: "1px solid rgba(196,181,253,0.20)",
+                  border: "1px solid rgba(34,255,102,0.20)",
                   borderRadius: 12, fontSize: 12,
                 }}
                 labelFormatter={(t) => new Date(t as number).toLocaleString()}
@@ -205,15 +205,15 @@ export function Statistics() {
         <div className="flex items-center gap-4 text-[10px] text-ink-mute pt-3 mt-2 border-t border-white/[0.04]">
           {showCpu && (
             <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-accent-lavender" /> CPU
+              <span className="h-2 w-2 rounded-full bg-accent-green" /> CPU
             </div>
           )}
           {showMem && (
             <div className="flex items-center gap-1.5">
               <span
                 className={cn(
-                  "h-1.5 w-3 rounded-full bg-accent-pink",
-                  metric === "both" && "bg-transparent border border-dashed border-accent-pink",
+                  "h-1.5 w-3 rounded-full bg-accent-bright",
+                  metric === "both" && "bg-transparent border border-dashed border-accent-bright",
                 )}
               /> Memory
             </div>

@@ -5,32 +5,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        cream: {
-          DEFAULT: "#ECE0CB",
-          deep:    "#E2D6BD",
-          card:    "#F0E5CC",
-        },
+        // Page + surfaces
         canvas: {
-          DEFAULT: "#0F1119",
-          elev:    "#181B26",
-          elev2:   "#212431",
-          line:    "#272A37",
+          DEFAULT: "#050507",   // body
+          elev:    "#0A0E0B",   // panels
+          elev2:   "#0F1410",   // popovers / nested cards
+          line:    "rgba(34,255,102,0.06)",
         },
-        ink: {
-          strong: "#F0E5CC",
-          DEFAULT: "#E5E1D6",
-          dim:    "#A09A8C",
-          mute:   "#6E6E7A",
-        },
+        // Accents — matrix terminal language
         accent: {
-          lavender:        "#C4B5FD",
-          lavender_strong: "#A78BFA",
-          pink:            "#F0ABFC",
-          peach:           "#F4B788",
-          mint:            "#A7F3D0",
+          green:  "#22FF66",
+          bright: "#7CFFA0",
+          dim:    "#0F5132",
+          glow:   "rgba(34,255,102,0.45)",
+        },
+        // Text
+        ink: {
+          strong: "#FFFFFF",
+          DEFAULT: "#D4D4D8",
+          dim:    "#7C7F84",
+          mute:   "#4D5057",
         },
         level: {
-          ok:   "#86EFAC",
+          ok:   "#22FF66",
           warn: "#FDE68A",
           crit: "#FCA5A5",
         },
@@ -44,9 +41,9 @@ const config: Config = {
         card:   "1.25rem",
       },
       boxShadow: {
-        canvas: "0 24px 60px -24px rgba(15, 17, 25, 0.45)",
-        chip:   "0 8px 24px -10px rgba(167, 139, 250, 0.5)",
-        soft:   "0 2px 12px rgba(0,0,0,0.18)",
+        canvas: "0 24px 60px -24px rgba(0, 0, 0, 0.85)",
+        chip:   "0 8px 24px -10px rgba(34, 255, 102, 0.5)",
+        soft:   "0 2px 12px rgba(0,0,0,0.45)",
       },
     },
   },
