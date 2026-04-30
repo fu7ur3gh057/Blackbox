@@ -7,19 +7,22 @@ import { cn, relativeTime } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
-  ChevronDown,
+  Clock,
   Cpu,
   HardDrive,
+  History,
   Loader2,
   MemoryStick,
   Network,
   Play,
   Search,
   Server,
+  TrendingUp,
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   cpu: Cpu, memory: MemoryStick, disk: HardDrive,
@@ -40,6 +43,10 @@ export default function ChecksPage() {
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState<LevelFilter>("all");
   const [busy, setBusy] = useState(false);
+  // History drawer — single global slot. Expanding history doesn't
+  // disrupt the card grid this way; closing a card and opening another
+  // swaps the drawer body without animation jank.
+  const [drawerCheck, setDrawerCheck] = useState<CheckSummary | null>(null);
 
   const summary = useMemo(() => {
     let ok = 0, warn = 0, crit = 0, never = 0;
@@ -153,8 +160,21 @@ export default function ChecksPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((c) => <CheckCard key={c.name} check={c} />)}
+          {filtered.map((c) => (
+            <CheckCard
+              key={c.name}
+              check={c}
+              onShowHistory={() => setDrawerCheck(c)}
+            />
+          ))}
         </div>
+      )}
+
+      {drawerCheck && (
+        <HistoryDrawer
+          check={drawerCheck}
+          onClose={() => setDrawerCheck(null)}
+        />
       )}
     </div>
   );
@@ -209,15 +229,18 @@ const LEVEL_TONE: Record<Level | "none", { text: string; bg: string; ring: strin
   none: { text: "text-ink-mute",   bg: "bg-white/[0.04]",      ring: "ring-white/10",      fill: "#7C7F84" },
 };
 
-function CheckCard({ check }: { check: CheckSummary }) {
-  const [open, setOpen] = useState(false);
+function CheckCard({
+  check, onShowHistory,
+}: {
+  check: CheckSummary;
+  onShowHistory: () => void;
+}) {
   const [running, setRunning] = useState(false);
   const qc = useQueryClient();
   const Icon = TYPE_ICON[check.type] ?? Activity;
   const tone = LEVEL_TONE[check.level ?? "none"];
 
-  // Hour window — enough datapoints for a sparkline at most check
-  // intervals without pulling down megabytes of history.
+  // Inline sparkline — short window, just enough for a thumbnail.
   const since = Math.floor(Date.now() / 1000) - 6 * 3600;
   const { data: history = [] } = useQuery({
     queryKey: ["checks", check.name, "history", { since }],
@@ -244,7 +267,6 @@ function CheckCard({ check }: { check: CheckSummary }) {
 
   return (
     <div className="rounded-card border border-white/[0.05] bg-canvas-elev overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-4 border-b border-white/[0.04]">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -265,7 +287,6 @@ function CheckCard({ check }: { check: CheckSummary }) {
         </div>
       </div>
 
-      {/* Body */}
       <div className="px-5 pt-4 pb-3">
         <div className="flex items-baseline gap-3">
           {check.last_value != null ? (
@@ -294,7 +315,6 @@ function CheckCard({ check }: { check: CheckSummary }) {
         </div>
       </div>
 
-      {/* Footer */}
       <div className="px-5 py-3 border-t border-white/[0.04] bg-black/20 flex items-center gap-2">
         <button
           onClick={runNow}
@@ -309,47 +329,235 @@ function CheckCard({ check }: { check: CheckSummary }) {
           run
         </button>
         <button
-          onClick={() => setOpen((v) => !v)}
+          onClick={onShowHistory}
           className={cn(
             "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10.5px] font-mono ring-1 transition-colors ml-auto",
-            open
-              ? "bg-accent-pale/[0.10] text-accent-pale ring-accent-pale/25"
-              : "bg-white/[0.04] text-ink-dim ring-white/[0.06] hover:bg-white/[0.08]",
+            "bg-white/[0.04] text-ink-dim ring-white/[0.06] hover:bg-white/[0.08] hover:text-accent-pale",
           )}
         >
-          <ChevronDown size={11} className={cn("transition-transform", open && "rotate-180")} />
-          {open ? "hide history" : `history (${history.length})`}
+          <History size={11} />
+          history
         </button>
       </div>
+    </div>
+  );
+}
 
-      {/* Expanded history */}
-      {open && (
-        <div className="border-t border-white/[0.04] bg-black/20 px-5 py-4">
-          {history.length === 0 ? (
-            <div className="text-[11px] text-ink-mute font-mono text-center py-4">no history yet</div>
-          ) : (
-            <>
-              <Sparkline points={history} large className="mb-3" />
-              <div className="rounded-lg bg-black/40 border border-white/[0.04] divide-y divide-white/[0.04] max-h-[240px] overflow-y-auto">
-                {history.slice().reverse().slice(0, 30).map((r) => {
+// ── history drawer ───────────────────────────────────────────────────
+
+
+type DrawerRange = "1h" | "6h" | "24h" | "7d";
+const DRAWER_RANGE_S: Record<DrawerRange, number> = {
+  "1h":  3600,
+  "6h":  6 * 3600,
+  "24h": 24 * 3600,
+  "7d":  7 * 24 * 3600,
+};
+
+function HistoryDrawer({
+  check, onClose,
+}: {
+  check: CheckSummary;
+  onClose: () => void;
+}) {
+  const [range, setRange] = useState<DrawerRange>("24h");
+  const since = Math.floor(Date.now() / 1000) - DRAWER_RANGE_S[range];
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ["checks", check.name, "history", { since, key: range }],
+    queryFn: () =>
+      api.get<CheckResult[]>(
+        `/checks/${encodeURIComponent(check.name)}/history?since=${since}&limit=2000`,
+      ),
+    staleTime: 30_000,
+  });
+
+  // Close on ESC, lock body scroll while open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  const Icon = TYPE_ICON[check.type] ?? Activity;
+  const tone = LEVEL_TONE[check.level ?? "none"];
+
+  // Stats from the loaded history.
+  const stats = useMemo(() => {
+    const vals: number[] = [];
+    let okN = 0, warnN = 0, critN = 0;
+    for (const r of history) {
+      if (r.level === "ok") okN++;
+      else if (r.level === "warn") warnN++;
+      else if (r.level === "crit") critN++;
+      const v = (r.metrics as { value?: number } | null)?.value;
+      if (typeof v === "number") vals.push(v);
+    }
+    vals.sort((a, b) => a - b);
+    const min = vals[0];
+    const max = vals[vals.length - 1];
+    const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+    const p95 = vals.length ? vals[Math.floor(vals.length * 0.95)] : null;
+    return { ok: okN, warn: warnN, crit: critN, min, max, avg, p95, count: history.length };
+  }, [history]);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex">
+      {/* backdrop */}
+      <div
+        className="flex-1 bg-black/60 backdrop-blur-sm animate-[reveal-in_0.2s_ease-out]"
+        onClick={onClose}
+      />
+      {/* panel */}
+      <div className="w-full max-w-[640px] h-full bg-canvas-elev border-l border-white/[0.06] flex flex-col animate-[reveal-in_0.2s_ease-out] shadow-canvas">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-white/[0.05] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center ring-1", tone.bg, tone.text, tone.ring)}>
+              <Icon size={16} strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[15px] font-semibold text-ink-strong truncate">{check.name}</div>
+              <div className="text-[10.5px] font-mono text-ink-mute uppercase tracking-wider">
+                {check.type} · every {check.interval}s
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            title="close (Esc)"
+            className="h-8 w-8 rounded-lg flex items-center justify-center text-ink-mute hover:bg-white/[0.05] hover:text-ink-strong transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Range chips */}
+        <div className="px-5 py-3 border-b border-white/[0.04] flex items-center gap-1.5">
+          <Clock size={11} className="text-ink-mute mr-1" />
+          {(["1h", "6h", "24h", "7d"] as DrawerRange[]).map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[10.5px] font-mono uppercase tracking-wider transition-colors",
+                range === r
+                  ? "bg-accent-pale/15 text-accent-pale ring-1 ring-accent-pale/30"
+                  : "bg-white/[0.04] text-ink-dim ring-1 ring-white/[0.06] hover:bg-white/[0.08]",
+              )}
+            >
+              {r}
+            </button>
+          ))}
+          <span className="ml-auto text-[10px] font-mono text-ink-mute tabular-nums">
+            {history.length} samples
+          </span>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* Chart */}
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={11} className="text-ink-mute" />
+              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-dim font-mono">trend</span>
+            </div>
+            <div className="rounded-xl bg-black/30 border border-white/[0.04] p-3">
+              {isLoading ? (
+                <div className="h-[120px] flex items-center justify-center text-[11px] font-mono text-ink-mute">
+                  loading…
+                </div>
+              ) : history.length === 0 ? (
+                <div className="h-[120px] flex items-center justify-center text-[11px] font-mono text-ink-mute">
+                  no samples in this range
+                </div>
+              ) : (
+                <Sparkline points={history} large />
+              )}
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="px-5 pb-4">
+            <div className="grid grid-cols-3 gap-2">
+              <Stat label="min" value={stats.min} unit={unitFor(check.type)} />
+              <Stat label="avg" value={stats.avg} unit={unitFor(check.type)} />
+              <Stat label="max" value={stats.max} unit={unitFor(check.type)} />
+              <Stat label="ok"   value={stats.ok}   tone="ok" />
+              <Stat label="warn" value={stats.warn} tone="warn" />
+              <Stat label="crit" value={stats.crit} tone="crit" />
+            </div>
+          </div>
+
+          {/* Event log */}
+          <div className="px-5 pb-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-dim font-mono">events</span>
+              <span className="text-[10px] text-ink-mute font-mono">· newest first</span>
+            </div>
+            <div className="rounded-xl bg-black/30 border border-white/[0.04] divide-y divide-white/[0.04]">
+              {history.length === 0 ? (
+                <div className="px-3 py-4 text-[11px] font-mono text-ink-mute text-center">
+                  nothing yet
+                </div>
+              ) : (
+                history.slice().reverse().map((r) => {
                   const t = LEVEL_TONE[r.level as Level] ?? LEVEL_TONE.none;
                   const v = (r.metrics as { value?: number } | null)?.value;
                   return (
-                    <div key={r.id} className="grid grid-cols-[80px_60px_1fr_auto] gap-3 px-3 py-1.5 text-[10.5px] font-mono items-center">
+                    <div
+                      key={r.id}
+                      className="grid grid-cols-[88px_56px_1fr_auto] gap-3 px-3 py-2 text-[11px] font-mono items-center"
+                    >
                       <span className="text-ink-mute tabular-nums">{relativeTime(r.ts)}</span>
-                      <span className={cn("uppercase tracking-wider text-[9.5px]", t.text)}>{r.level}</span>
+                      <span className={cn(
+                        "uppercase tracking-wider text-[9.5px] inline-flex items-center gap-1",
+                        t.text,
+                      )}>
+                        <span className={cn("h-1.5 w-1.5 rounded-full")} style={{ background: t.fill }} />
+                        {r.level}
+                      </span>
                       <span className="text-ink-dim truncate">{r.detail || "—"}</span>
                       <span className={cn("tabular-nums", t.text)}>
                         {v != null ? formatValue(v) + unitFor(check.type) : ""}
                       </span>
                     </div>
                   );
-                })}
-              </div>
-            </>
-          )}
+                })
+              )}
+            </div>
+          </div>
         </div>
-      )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function Stat({
+  label, value, unit, tone,
+}: {
+  label: string;
+  value: number | null | undefined;
+  unit?: string;
+  tone?: Level;
+}) {
+  const t = tone ? LEVEL_TONE[tone] : null;
+  return (
+    <div className="rounded-lg bg-black/40 border border-white/[0.04] px-3 py-2">
+      <div className="text-[9.5px] uppercase tracking-[0.16em] text-ink-mute font-mono">{label}</div>
+      <div className={cn(
+        "text-[16px] font-mono font-semibold tabular-nums leading-tight mt-0.5",
+        t?.text ?? "text-ink-strong",
+      )}>
+        {value == null ? "—" : formatValue(value)}
+        {unit && value != null && <span className="text-[10px] text-ink-mute ml-1">{unit}</span>}
+      </div>
     </div>
   );
 }
