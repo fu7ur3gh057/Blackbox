@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import type { CheckResult, CheckSummary, Level } from "@/lib/types";
 import { useChecksSnapshot } from "@/lib/use-snapshot";
 import { cn, relativeTime } from "@/lib/utils";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   Clock,
@@ -21,7 +21,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 const TYPE_ICON: Record<string, LucideIcon> = {
@@ -354,6 +354,9 @@ const DRAWER_RANGE_S: Record<DrawerRange, number> = {
   "7d":  7 * 24 * 3600,
 };
 
+const EVENTS_PAGE = 50;
+const CHART_LIMIT = 300;
+
 function HistoryDrawer({
   check, onClose,
 }: {
@@ -362,16 +365,72 @@ function HistoryDrawer({
 }) {
   const [range, setRange] = useState<DrawerRange>("24h");
   const since = Math.floor(Date.now() / 1000) - DRAWER_RANGE_S[range];
-  const { data: history = [], isLoading } = useQuery({
-    queryKey: ["checks", check.name, "history", { since, key: range }],
+
+  // Two queries:
+  //   - chartQuery — capped at CHART_LIMIT, used for the trend line + stats
+  //   - eventsInf — infinite-paginated table; loads more on scroll
+  const chartQuery = useQuery({
+    queryKey: ["checks", check.name, "chart", { since, key: range }],
     queryFn: () =>
       api.get<CheckResult[]>(
-        `/checks/${encodeURIComponent(check.name)}/history?since=${since}&limit=2000`,
+        `/checks/${encodeURIComponent(check.name)}/history?since=${since}&limit=${CHART_LIMIT}`,
       ),
     staleTime: 30_000,
   });
 
-  // Close on ESC, lock body scroll while open.
+  const eventsInf = useInfiniteQuery({
+    queryKey: ["checks", check.name, "events", { since, key: range }],
+    initialPageParam: undefined as number | undefined,
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({
+        since: String(since),
+        limit: String(EVENTS_PAGE),
+      });
+      if (pageParam) params.set("before", String(pageParam));
+      return api.get<CheckResult[]>(
+        `/checks/${encodeURIComponent(check.name)}/history?${params}`,
+      );
+    },
+    // Backend returns the newest `limit` rows in the range, chronological.
+    // Cursor for the *next-older* page is the OLDEST ts in this page.
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length < EVENTS_PAGE) return undefined;
+      return lastPage[0]?.ts;
+    },
+    staleTime: 30_000,
+  });
+
+  // Flatten infinite-pages, newest first for the table.
+  const events = useMemo(() => {
+    const all = (eventsInf.data?.pages ?? []).flat();
+    // each page is chronological; later pages are older. Flatten then sort
+    // newest-first.
+    return all.slice().sort((a, b) => b.ts - a.ts);
+  }, [eventsInf.data]);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // IntersectionObserver inside the scrollable body — auto-load more.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = scrollRef.current;
+    if (!sentinel || !root) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && eventsInf.hasNextPage && !eventsInf.isFetchingNextPage) {
+            eventsInf.fetchNextPage();
+          }
+        }
+      },
+      { root, rootMargin: "120px" },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [eventsInf, range]);
+
+  // ESC closes; lock body scroll while open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -386,11 +445,12 @@ function HistoryDrawer({
   const Icon = TYPE_ICON[check.type] ?? Activity;
   const tone = LEVEL_TONE[check.level ?? "none"];
 
-  // Stats from the loaded history.
+  // Stats are computed from the chart sample (already a bounded window).
+  const chartPoints = chartQuery.data ?? [];
   const stats = useMemo(() => {
     const vals: number[] = [];
     let okN = 0, warnN = 0, critN = 0;
-    for (const r of history) {
+    for (const r of chartPoints) {
       if (r.level === "ok") okN++;
       else if (r.level === "warn") warnN++;
       else if (r.level === "crit") critN++;
@@ -401,19 +461,16 @@ function HistoryDrawer({
     const min = vals[0];
     const max = vals[vals.length - 1];
     const avg = vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
-    const p95 = vals.length ? vals[Math.floor(vals.length * 0.95)] : null;
-    return { ok: okN, warn: warnN, crit: critN, min, max, avg, p95, count: history.length };
-  }, [history]);
+    return { ok: okN, warn: warnN, crit: critN, min, max, avg, count: chartPoints.length };
+  }, [chartPoints]);
 
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-50 flex">
-      {/* backdrop */}
       <div
         className="flex-1 bg-black/60 backdrop-blur-sm animate-[reveal-in_0.2s_ease-out]"
         onClick={onClose}
       />
-      {/* panel */}
       <div className="w-full max-w-[640px] h-full bg-canvas-elev border-l border-white/[0.06] flex flex-col animate-[reveal-in_0.2s_ease-out] shadow-canvas">
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/[0.05] flex items-center justify-between gap-3">
@@ -455,12 +512,12 @@ function HistoryDrawer({
             </button>
           ))}
           <span className="ml-auto text-[10px] font-mono text-ink-mute tabular-nums">
-            {history.length} samples
+            chart {chartPoints.length} · events {events.length}{eventsInf.hasNextPage ? "+" : ""}
           </span>
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
           {/* Chart */}
           <div className="px-5 py-4">
             <div className="flex items-center gap-2 mb-2">
@@ -468,16 +525,16 @@ function HistoryDrawer({
               <span className="text-[10px] uppercase tracking-[0.16em] text-ink-dim font-mono">trend</span>
             </div>
             <div className="rounded-xl bg-black/30 border border-white/[0.04] p-3">
-              {isLoading ? (
+              {chartQuery.isLoading ? (
                 <div className="h-[120px] flex items-center justify-center text-[11px] font-mono text-ink-mute">
                   loading…
                 </div>
-              ) : history.length === 0 ? (
+              ) : chartPoints.length === 0 ? (
                 <div className="h-[120px] flex items-center justify-center text-[11px] font-mono text-ink-mute">
                   no samples in this range
                 </div>
               ) : (
-                <Sparkline points={history} large />
+                <InteractiveChart points={chartPoints} unit={unitFor(check.type)} />
               )}
             </div>
           </div>
@@ -494,19 +551,23 @@ function HistoryDrawer({
             </div>
           </div>
 
-          {/* Event log */}
+          {/* Event log — infinite scroll */}
           <div className="px-5 pb-5">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] uppercase tracking-[0.16em] text-ink-dim font-mono">events</span>
-              <span className="text-[10px] text-ink-mute font-mono">· newest first</span>
+              <span className="text-[10px] text-ink-mute font-mono">· newest first · scroll for older</span>
             </div>
             <div className="rounded-xl bg-black/30 border border-white/[0.04] divide-y divide-white/[0.04]">
-              {history.length === 0 ? (
+              {eventsInf.isLoading && events.length === 0 ? (
+                <div className="px-3 py-4 text-[11px] font-mono text-ink-mute text-center">
+                  loading…
+                </div>
+              ) : events.length === 0 ? (
                 <div className="px-3 py-4 text-[11px] font-mono text-ink-mute text-center">
                   nothing yet
                 </div>
               ) : (
-                history.slice().reverse().map((r) => {
+                events.map((r) => {
                   const t = LEVEL_TONE[r.level as Level] ?? LEVEL_TONE.none;
                   const v = (r.metrics as { value?: number } | null)?.value;
                   return (
@@ -519,7 +580,7 @@ function HistoryDrawer({
                         "uppercase tracking-wider text-[9.5px] inline-flex items-center gap-1",
                         t.text,
                       )}>
-                        <span className={cn("h-1.5 w-1.5 rounded-full")} style={{ background: t.fill }} />
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: t.fill }} />
                         {r.level}
                       </span>
                       <span className="text-ink-dim truncate">{r.detail || "—"}</span>
@@ -530,6 +591,18 @@ function HistoryDrawer({
                   );
                 })
               )}
+            </div>
+
+            {/* Sentinel + status — always rendered so the observer can pick
+                it up even when there's no next page (it just sits there). */}
+            <div ref={sentinelRef} className="mt-2 px-3 py-2 text-center text-[10px] font-mono text-ink-mute">
+              {eventsInf.isFetchingNextPage
+                ? "loading older…"
+                : eventsInf.hasNextPage
+                ? "scroll to load older"
+                : events.length > 0
+                ? "— end of range —"
+                : ""}
             </div>
           </div>
         </div>
@@ -562,7 +635,218 @@ function Stat({
   );
 }
 
-// ── sparkline ────────────────────────────────────────────────────────
+// ── interactive chart with tooltip ────────────────────────────────────
+
+
+type Pt = { ts: number; v: number; level: Level; detail: string | null };
+
+function InteractiveChart({ points, unit }: { points: CheckResult[]; unit: string }) {
+  const padded = useMemo<Pt[]>(() => {
+    return points
+      .map((p) => ({
+        ts: p.ts,
+        v: typeof (p.metrics as { value?: number } | null)?.value === "number"
+          ? (p.metrics as { value: number }).value
+          : null,
+        level: p.level as Level,
+        detail: p.detail,
+      }))
+      .filter((p): p is Pt => p.v != null);
+  }, [points]);
+
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 0, h: 140 });
+  const [hover, setHover] = useState<{ px: number; py: number; pt: Pt } | null>(null);
+
+  // Track container size — chart redraws + tooltip math depend on it.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const r = el.getBoundingClientRect();
+      setSize({ w: r.width, h: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  if (padded.length === 0 || size.w === 0) {
+    return <div ref={wrapRef} className="relative h-[140px]" />;
+  }
+
+  const minTs = padded[0].ts;
+  const maxTs = padded[padded.length - 1].ts;
+  const tsRange = Math.max(1, maxTs - minTs);
+  const ys = padded.map((p) => p.v);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const yRange = Math.max(1, maxY - minY);
+
+  // Map domain → pixel coords. We render at the actual container size
+  // (no preserveAspectRatio gymnastics) so tooltip math is straightforward.
+  const padX = 4;
+  const padY = 8;
+  const usableW = size.w - padX * 2;
+  const usableH = size.h - padY * 2;
+  const xy = (p: Pt) => {
+    const x = padX + ((p.ts - minTs) / tsRange) * usableW;
+    const y = padY + (1 - (p.v - minY) / yRange) * usableH;
+    return { x, y };
+  };
+
+  let path = "";
+  for (let i = 0; i < padded.length; i++) {
+    const { x, y } = xy(padded[i]);
+    path += `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)} `;
+  }
+  const area = `${path} L ${padX + usableW} ${padY + usableH} L ${padX} ${padY + usableH} Z`;
+
+  const last = padded[padded.length - 1];
+  const lastTone = LEVEL_TONE[last.level] ?? LEVEL_TONE.none;
+  const { x: lastX, y: lastY } = xy(last);
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    const rect = wrapRef.current!.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    // Find nearest point by ts. Binary search keeps this fast for 300 pts.
+    const target = minTs + ((px - padX) / usableW) * tsRange;
+    let lo = 0, hi = padded.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (padded[mid].ts < target) lo = mid + 1;
+      else hi = mid;
+    }
+    const pt = padded[lo];
+    if (!pt) return;
+    const c = xy(pt);
+    setHover({ px: c.x, py: c.y, pt });
+  };
+
+  return (
+    <div
+      ref={wrapRef}
+      className="relative h-[140px] cursor-crosshair"
+      onMouseMove={onMouseMove}
+      onMouseLeave={() => setHover(null)}
+    >
+      <svg width={size.w} height={size.h} className="absolute inset-0">
+        <defs>
+          <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stopColor="#FFFFFF" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* horizontal grid */}
+        {[0.25, 0.5, 0.75].map((p) => (
+          <line
+            key={p}
+            x1={padX} x2={padX + usableW}
+            y1={padY + p * usableH} y2={padY + p * usableH}
+            stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" strokeWidth="0.5"
+          />
+        ))}
+
+        <path d={area} fill="url(#chart-fill)" />
+        <path d={path} fill="none" stroke="#E0E0E5" strokeWidth={1.4} strokeLinejoin="round" />
+
+        {/* hover crosshair + dot */}
+        {hover && (
+          <g pointerEvents="none">
+            <line
+              x1={hover.px} x2={hover.px}
+              y1={padY} y2={padY + usableH}
+              stroke="rgba(255,255,255,0.25)" strokeDasharray="2 2" strokeWidth="0.8"
+            />
+            <circle cx={hover.px} cy={hover.py} r={3.4} fill={(LEVEL_TONE[hover.pt.level] ?? LEVEL_TONE.none).fill} />
+            <circle cx={hover.px} cy={hover.py} r={5.5} fill="none" stroke={(LEVEL_TONE[hover.pt.level] ?? LEVEL_TONE.none).fill} strokeOpacity="0.4" />
+          </g>
+        )}
+
+        {/* trailing dot */}
+        <circle cx={lastX} cy={lastY} r={2.4} fill={lastTone.fill} />
+      </svg>
+
+      {/* Tooltip — positioned in container space, flips above/below the
+          point and clamps to container edges so it never escapes. */}
+      {hover && (
+        <ChartTooltip
+          x={hover.px}
+          y={hover.py}
+          ts={hover.pt.ts}
+          value={hover.pt.v}
+          unit={unit}
+          level={hover.pt.level}
+          detail={hover.pt.detail}
+          containerW={size.w}
+          containerH={size.h}
+        />
+      )}
+    </div>
+  );
+}
+
+function ChartTooltip({
+  x, y, ts, value, unit, level, detail, containerW, containerH,
+}: {
+  x: number; y: number;
+  ts: number; value: number; unit: string;
+  level: Level; detail: string | null;
+  containerW: number; containerH: number;
+}) {
+  const TIP_W = 200;
+  const TIP_H = 78;
+  const GAP = 12;
+  // Prefer above the point; fall back to below if no room. Clamp X.
+  const above = y > TIP_H + GAP;
+  const top = above ? y - TIP_H - GAP : y + GAP;
+  const left = Math.max(4, Math.min(containerW - TIP_W - 4, x - TIP_W / 2));
+  const tone = LEVEL_TONE[level] ?? LEVEL_TONE.none;
+  const date = new Date(ts * 1000);
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  const ss = String(date.getSeconds()).padStart(2, "0");
+  // Suppress unused-warning — we have container H from the caller for
+  // future "always inside" logic; it's already used above (y > TIP_H+GAP).
+  void containerH;
+
+  return (
+    <div
+      className={cn(
+        "absolute z-10 pointer-events-none",
+        "rounded-lg bg-canvas-elev2/95 backdrop-blur-sm",
+        "border border-white/[0.08] shadow-soft",
+        "px-3 py-2 font-mono",
+      )}
+      style={{ left, top, width: TIP_W }}
+    >
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-ink-mute">
+          {hh}:{mm}:{ss}
+        </span>
+        <span className={cn(
+          "px-1.5 py-[1px] rounded text-[8.5px] font-bold tracking-wider uppercase",
+          tone.bg, tone.text,
+        )}>
+          {level}
+        </span>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <span className={cn("text-[18px] font-semibold tabular-nums leading-none", tone.text)}>
+          {formatValue(value)}
+        </span>
+        {unit && <span className="text-[10px] text-ink-mute">{unit}</span>}
+      </div>
+      {detail && (
+        <div className="text-[10px] text-ink-dim leading-snug truncate mt-1" title={detail}>
+          {detail}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── sparkline (compact, used inside cards) ───────────────────────────
 
 
 function Sparkline({
