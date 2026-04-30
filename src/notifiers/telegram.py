@@ -61,20 +61,28 @@ _TITLES = {
     },
 }
 
+# Percentage values are wrapped in <tg-spoiler> so they aren't visible at a
+# glance in chat previews / over-the-shoulder views — tap to reveal.
 _BODIES_FIRING = {
     "en": {
-        "cpu": "CPU is at <b>{value:.1f}%</b> (threshold: <b>{threshold:.0f}%</b>).",
-        "memory": "Memory is at <b>{value:.1f}%</b> (threshold: <b>{threshold:.0f}%</b>).",
-        "disk": "Partition <code>{path}</code> is at <b>{value:.1f}%</b> "
-                "(threshold: <b>{threshold:.0f}%</b>, free: <b>{free_gb:.1f} GB</b>).",
+        "cpu": "CPU is at <tg-spoiler><b>{value:.1f}%</b></tg-spoiler> "
+               "(threshold: <tg-spoiler><b>{threshold:.0f}%</b></tg-spoiler>).",
+        "memory": "Memory is at <tg-spoiler><b>{value:.1f}%</b></tg-spoiler> "
+                  "(threshold: <tg-spoiler><b>{threshold:.0f}%</b></tg-spoiler>).",
+        "disk": "Partition <code>{path}</code> is at <tg-spoiler><b>{value:.1f}%</b></tg-spoiler> "
+                "(threshold: <tg-spoiler><b>{threshold:.0f}%</b></tg-spoiler>, "
+                "free: <b>{free_gb:.1f} GB</b>).",
         "http": "<code>{url}</code> — <b>{summary}</b>",
         "systemd": "Unit <code>{unit}</code> state: <b>{state}</b>",
     },
     "ru": {
-        "cpu": "CPU загружен на <b>{value:.1f}%</b> (порог: <b>{threshold:.0f}%</b>).",
-        "memory": "Память занята на <b>{value:.1f}%</b> (порог: <b>{threshold:.0f}%</b>).",
-        "disk": "Раздел <code>{path}</code> заполнен на <b>{value:.1f}%</b> "
-                "(порог: <b>{threshold:.0f}%</b>, свободно: <b>{free_gb:.1f} ГБ</b>).",
+        "cpu": "CPU загружен на <tg-spoiler><b>{value:.1f}%</b></tg-spoiler> "
+               "(порог: <tg-spoiler><b>{threshold:.0f}%</b></tg-spoiler>).",
+        "memory": "Память занята на <tg-spoiler><b>{value:.1f}%</b></tg-spoiler> "
+                  "(порог: <tg-spoiler><b>{threshold:.0f}%</b></tg-spoiler>).",
+        "disk": "Раздел <code>{path}</code> заполнен на <tg-spoiler><b>{value:.1f}%</b></tg-spoiler> "
+                "(порог: <tg-spoiler><b>{threshold:.0f}%</b></tg-spoiler>, "
+                "свободно: <b>{free_gb:.1f} ГБ</b>).",
         "http": "<code>{url}</code> — <b>{summary}</b>",
         "systemd": "Юнит <code>{unit}</code> в состоянии: <b>{state}</b>",
     },
@@ -82,16 +90,18 @@ _BODIES_FIRING = {
 
 _BODIES_OK = {
     "en": {
-        "cpu": "CPU is now at <b>{value:.1f}%</b>.",
-        "memory": "Memory is now at <b>{value:.1f}%</b>.",
-        "disk": "Partition <code>{path}</code> is back to <b>{value:.1f}%</b> used.",
+        "cpu": "CPU is now at <tg-spoiler><b>{value:.1f}%</b></tg-spoiler>.",
+        "memory": "Memory is now at <tg-spoiler><b>{value:.1f}%</b></tg-spoiler>.",
+        "disk": "Partition <code>{path}</code> is back to "
+                "<tg-spoiler><b>{value:.1f}%</b></tg-spoiler> used.",
         "http": "<code>{url}</code> is responding again.",
         "systemd": "Unit <code>{unit}</code> is active again.",
     },
     "ru": {
-        "cpu": "CPU вернулся к <b>{value:.1f}%</b>.",
-        "memory": "Память вернулась к <b>{value:.1f}%</b>.",
-        "disk": "Раздел <code>{path}</code> вернулся к <b>{value:.1f}%</b>.",
+        "cpu": "CPU вернулся к <tg-spoiler><b>{value:.1f}%</b></tg-spoiler>.",
+        "memory": "Память вернулась к <tg-spoiler><b>{value:.1f}%</b></tg-spoiler>.",
+        "disk": "Раздел <code>{path}</code> вернулся к "
+                "<tg-spoiler><b>{value:.1f}%</b></tg-spoiler>.",
         "http": "<code>{url}</code> снова отвечает.",
         "systemd": "Юнит <code>{unit}</code> снова активен.",
     },
