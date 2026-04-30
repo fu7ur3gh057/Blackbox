@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 def build_report_context(
     raw: dict,
     notifiers_by_type: dict[str, Notifier],
-    logs_storage_path: str | None = None,
+    logs_enabled: bool = False,
 ) -> dict | None:
     """Returns {hostname, lang, sections, targets} or None if nothing to render
     or no notifier picked up. Caller schedules the actual digest via TaskIQ."""
@@ -29,7 +29,7 @@ def build_report_context(
         target = list(notifiers_by_type.values())
 
     lang = raw.get("lang") or (getattr(target[0], "lang", "en") if target else "en")
-    sections = _build_sections(raw, lang=lang, logs_storage_path=logs_storage_path)
+    sections = _build_sections(raw, lang=lang, logs_enabled=logs_enabled)
     if not sections or not target:
         return None
 
@@ -44,7 +44,7 @@ def build_report_context(
 def _build_sections(
     raw: dict,
     lang: str = "en",
-    logs_storage_path: str | None = None,
+    logs_enabled: bool = False,
 ) -> list[Section]:
     sections: list[Section] = []
     host = raw.get("host") or {}
@@ -82,12 +82,11 @@ def _build_sections(
     for dlq in raw.get("dlq") or []:
         sections.append(DlqSection(**dlq))
 
-    if logs_storage_path:
+    if logs_enabled:
         re_cfg = raw.get("recent_errors")
         if re_cfg is not False:
             re_cfg = re_cfg if isinstance(re_cfg, dict) else {}
             sections.append(RecentErrorsSection(
-                storage_path=logs_storage_path,
                 limit=int(re_cfg.get("limit", 5)),
                 lang=lang,
             ))

@@ -1,33 +1,50 @@
 import logging
-from pathlib import Path
 
 from ..notifiers.base import Notifier
 from .processor import LogProcessor
 from .sources.docker import DockerLogSource
 from .sources.file import FileLogSource
 from .sources.journal import JournalLogSource
-from .storage import JsonlStorage
+from .store import LogEventStore
 
 log = logging.getLogger(__name__)
+
+
+def build_log_store(raw: dict | None) -> LogEventStore:
+    """Storage is always SQLite-backed; the only knobs are retention.
+
+    Accepts the new schema (`retention_days`, `max_rows`) at the top of
+    the `logs:` block, or under `logs.storage:` for symmetry with the
+    old shape. Legacy `path` / `max_size_mb` / `keep_archives` keys are
+    silently ignored — they were JSONL-specific and the file isn't
+    written any more.
+    """
+    raw = raw or {}
+    storage_cfg = raw.get("storage") or {}
+    retention_days = (
+        raw.get("retention_days")
+        or storage_cfg.get("retention_days")
+        or 7
+    )
+    max_rows = (
+        raw.get("max_rows")
+        or storage_cfg.get("max_rows")
+        or 200_000
+    )
+    return LogEventStore(retention_days=int(retention_days), max_rows=int(max_rows))
 
 
 def build_log_processor(
     raw: dict,
     notifiers_by_type: dict[str, Notifier],
+    *,
+    store: LogEventStore | None = None,
 ) -> LogProcessor | None:
     """Build the stream consumer. Notifier dispatch happens via TaskIQ tasks
     (tasks.logs.*), so this factory only validates that at least one notifier
     is reachable — it doesn't pass the list down."""
     if not raw:
         return None
-
-    storage_cfg = raw.get("storage") or {}
-    storage_path = Path(storage_cfg.get("path", "logs/blackbox.jsonl"))
-    storage = JsonlStorage(
-        path=storage_path,
-        max_size_mb=int(storage_cfg.get("max_size_mb", 10)),
-        keep_archives=int(storage_cfg.get("keep_archives", 7)),
-    )
 
     selected = raw.get("notifier")
     if selected and selected in notifiers_by_type:
@@ -72,8 +89,11 @@ def build_log_processor(
 
     return LogProcessor(
         sources=sources,
-        storage=storage,
+        store=store or build_log_store(raw),
         digest_interval=float(raw.get("digest_interval", 3600)),
         max_signatures=int(raw.get("max_signatures", 5000)),
         lang=lang,
     )
+
+
+__all__ = ["LogEventStore", "build_log_processor", "build_log_store"]

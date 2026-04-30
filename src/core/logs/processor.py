@@ -1,8 +1,8 @@
 """Log stream consumer.
 
 Streams from configured sources (file/journal/docker poll), dedups by
-signature, persists every line to JsonlStorage, and routes notifications
-through TaskIQ tasks (`tasks.logs.notify_log_first`,
+signature, persists every line to LogEventStore (SQLite), and routes
+notifications through TaskIQ tasks (`tasks.logs.notify_log_first`,
 `tasks.logs.notify_log_digest`).
 
 Signature state lives in SQLite (`log_signatures`) so first-seen dedup
@@ -20,7 +20,7 @@ import time
 from sqlmodel import select
 
 from .base import LogSource
-from .storage import JsonlStorage
+from .store import LogEventStore
 
 log = logging.getLogger(__name__)
 
@@ -42,13 +42,13 @@ class LogProcessor:
     def __init__(
         self,
         sources: list[LogSource],
-        storage: JsonlStorage,
+        store: LogEventStore,
         digest_interval: float = 3600.0,
         max_signatures: int = 5000,
         lang: str = "en",
     ) -> None:
         self.sources = sources
-        self.storage = storage
+        self.store = store
         self.digest_interval = digest_interval
         self.max_signatures = max_signatures
         self.lang = lang
@@ -63,8 +63,9 @@ class LogProcessor:
             return
         await self._hydrate_from_db()
         log.info(
-            "logs: %d sources, digest every %.0fs, storage at %s, sigs cached %d",
-            len(self.sources), self.digest_interval, self.storage.path, len(self._sigs),
+            "logs: %d sources, digest every %.0fs, retention %dd / %d rows, sigs cached %d",
+            len(self.sources), self.digest_interval,
+            self.store.retention_days, self.store.max_rows, len(self._sigs),
         )
         tasks = [self._consume(s) for s in self.sources]
         tasks.append(self._digest_loop())
@@ -117,13 +118,10 @@ class LogProcessor:
             info["since_digest"] += 1
             info["total"] += 1
 
-        try:
-            self.storage.append({
-                "ts": now, "source": source_name, "sig": sig,
-                "first": first, "line": line[:2000],
-            })
-        except Exception:
-            log.exception("logs: storage append failed")
+        await self.store.insert({
+            "ts": now, "source": source_name, "sig": sig,
+            "first": first, "line": line[:2000],
+        })
 
         await self._persist_sig(sig, source_name, line, now, self._sigs[sig]["total"], first)
 

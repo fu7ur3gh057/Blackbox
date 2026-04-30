@@ -22,6 +22,7 @@ from services.taskiq.broker import broker
 from web.sockets.namespaces import (
     AlertsNamespace,
     ChecksNamespace,
+    DockerNamespace,
     LogsNamespace,
     SystemNamespace,
 )
@@ -48,6 +49,7 @@ def init_socketio(
     )
     server.register_namespace(AlertsNamespace("/alerts"))
     server.register_namespace(ChecksNamespace("/checks"))
+    server.register_namespace(DockerNamespace("/docker"))
     server.register_namespace(LogsNamespace("/logs"))
     server.register_namespace(SystemNamespace("/system"))
 
@@ -60,7 +62,7 @@ def init_socketio(
 
     broker.state.sio_server = server
     log.info(
-        "socket.io mounted at /%s — namespaces: /alerts /checks /logs /system",
+        "socket.io mounted at /%s — namespaces: /alerts /checks /docker /logs /system",
         sio_path,
     )
     return server

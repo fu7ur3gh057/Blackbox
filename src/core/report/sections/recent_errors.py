@@ -1,6 +1,4 @@
-import json
 import time
-from pathlib import Path
 
 from .base import SectionResult
 
@@ -11,15 +9,19 @@ _LABELS = {
 
 
 class RecentErrorsSection:
-    def __init__(self, storage_path: str, limit: int = 5, lang: str = "en") -> None:
-        self.storage_path = Path(storage_path)
-        self.limit = limit
+    """Pulls the last N unique-by-signature events from `LogEventStore`.
+
+    The store is shared across the daemon — REST routes, the processor's
+    fan-out and this section read from the same `broker.state.log_store`.
+    """
+
+    def __init__(self, limit: int = 5, lang: str = "en") -> None:
+        self.limit = max(1, int(limit))
         self.lang = lang
 
     async def render(self) -> SectionResult:
         L = _LABELS.get(self.lang, _LABELS["en"])
-
-        events = self._tail()
+        events = await self._tail()
         if not events:
             return SectionResult(text=f"{L['title']}\n— {L['empty']}")
 
@@ -32,37 +34,22 @@ class RecentErrorsSection:
             lines.append(f"• {ts} {src}: {sample}")
         return SectionResult(text="\n".join(lines))
 
-    def _tail(self) -> list[dict]:
-        try:
-            size = self.storage_path.stat().st_size
-        except OSError:
-            return []
-        offset = max(0, size - 64 * 1024)
-        try:
-            with self.storage_path.open("rb") as f:
-                f.seek(offset)
-                chunk = f.read().decode("utf-8", "replace")
-        except OSError:
-            return []
+    async def _tail(self) -> list[dict]:
+        from services.taskiq.broker import broker
 
-        events: list[dict] = []
-        for line in chunk.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-        # last N unique signatures (most recent first), then chronological
+        store = broker.state.data.get("log_store")
+        if store is None:
+            return []
+        # Pull a generous window, then dedup by signature (newest first).
+        events = await store.tail(limit=self.limit * 20)
         seen: set[str] = set()
         unique: list[dict] = []
-        for ev in reversed(events):
+        for ev in events:
             sig = ev.get("sig")
             if sig and sig not in seen:
                 seen.add(sig)
                 unique.append(ev)
                 if len(unique) >= self.limit:
                     break
+        # Caller renders chronological order.
         return list(reversed(unique))

@@ -25,5 +25,7 @@ class AppContext:
     report_lang: str = "en"
     report_sections: list[Section] = field(default_factory=list)
     report_targets: list[Notifier] = field(default_factory=list)
-    # Logs
-    log_storage_path: str | None = None
+    # Logs — set when a `logs:` block is present in config; the actual
+    # `LogEventStore` instance lives on broker.state.log_store so the
+    # processor, REST routes and report sections share one handle.
+    logs_enabled: bool = False

@@ -44,3 +44,15 @@ async def notify_log_digest(
             await n.send_log_digest(items, period_label=period_label)
         except Exception:
             log.exception("notify_log_digest: %s failed", type(n).__name__)
+
+
+@broker.task
+async def prune_log_events() -> None:
+    """Bound the `log_events` table by retention/cap. Scheduled hourly."""
+    store = broker.state.data.get("log_store")
+    if store is None:
+        return
+    try:
+        await store.prune()
+    except Exception:
+        log.exception("prune_log_events failed")

@@ -12,6 +12,9 @@ keep on disk indefinitely with a periodic cleanup.
 - LogSignatureEntry: dedup table for LogProcessor; first-seen state survives
   across daemon restarts so we don't re-fire `notify_log_first` for old
   errors that were already digested.
+- LogEvent: append-only log of every matched line LogProcessor records.
+  Pruned periodically per `retention_days` / `max_rows` so the table stays
+  bounded — replaces the legacy JSONL file storage.
 """
 
 from sqlalchemy import JSON, Column
@@ -58,3 +61,14 @@ class LogSignatureEntry(SQLModel, table=True):
     sample: str
     first_seen: float
     total: int = 0
+
+
+class LogEvent(SQLModel, table=True):
+    __tablename__ = "log_events"
+
+    id: int | None = Field(default=None, primary_key=True)
+    ts: float = Field(index=True)
+    source: str = Field(index=True)
+    sig: str = Field(index=True)
+    first: bool = False
+    line: str

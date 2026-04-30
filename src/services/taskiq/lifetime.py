@@ -11,6 +11,7 @@ from pathlib import Path
 
 from core.checks import build_check
 from config import Config
+from core.logs import build_log_store
 from core.notifiers import build_notifier
 from core.report import build_report_context
 from db.lifetime import init_db, shutdown_db
@@ -36,20 +37,21 @@ async def init_broker(config: Config) -> AppContext:
         notifiers=notifiers,
     )
 
+    if config.logs:
+        ctx.logs_enabled = True
+        broker.state.log_store = build_log_store(config.logs)
+
     if config.report:
         report_ctx = build_report_context(
             config.report,
             notifiers_by_type,
-            logs_storage_path=((config.logs or {}).get("storage") or {}).get("path"),
+            logs_enabled=ctx.logs_enabled,
         )
         if report_ctx is not None:
             ctx.report_hostname = report_ctx["hostname"]
             ctx.report_lang = report_ctx["lang"]
             ctx.report_sections = report_ctx["sections"]
             ctx.report_targets = report_ctx["targets"]
-
-    if config.logs:
-        ctx.log_storage_path = ((config.logs or {}).get("storage") or {}).get("path")
 
     broker.state.app_ctx = ctx
     await broker.startup()

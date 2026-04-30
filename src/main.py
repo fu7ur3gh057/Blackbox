@@ -43,6 +43,7 @@ def main() -> None:
     config_path, web_flag = _parse_args(sys.argv[1:])
     config = load_config(config_path)
     web_enabled = web_flag or bool((getattr(config, "web", None) or {}).get("enabled"))
+    broker.state.config_path = str(Path(config_path).resolve())
     asyncio.run(_run(config, web_enabled=web_enabled))
 
 
@@ -63,11 +64,15 @@ async def _run(config: Config, *, web_enabled: bool) -> None:
 
     coros = []
 
-    if ctx.checks_by_name or ctx.report_targets:
+    if ctx.checks_by_name or ctx.report_targets or ctx.logs_enabled:
         coros.append(run_scheduler(ctx))
 
     if config.logs:
-        log_processor = build_log_processor(config.logs, ctx.notifiers_by_type)
+        log_processor = build_log_processor(
+            config.logs,
+            ctx.notifiers_by_type,
+            store=broker.state.data.get("log_store"),
+        )
         if log_processor is not None:
             coros.append(log_processor.run())
 

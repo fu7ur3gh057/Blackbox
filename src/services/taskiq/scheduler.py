@@ -21,6 +21,7 @@ log = logging.getLogger(__name__)
 
 async def run_scheduler(ctx: "AppContext") -> None:
     from tasks.checks import run_check
+    from tasks.logs import prune_log_events
     from tasks.report import build_and_send_report
 
     coros = []
@@ -30,6 +31,9 @@ async def run_scheduler(ctx: "AppContext") -> None:
     if ctx.report_sections and ctx.report_targets:
         report_interval = float((ctx.config.report or {}).get("interval", 300))
         coros.append(_periodic("report", report_interval, lambda: build_and_send_report.kiq()))
+
+    if ctx.logs_enabled:
+        coros.append(_periodic("logs-prune", 3600.0, lambda: prune_log_events.kiq()))
 
     if not coros:
         log.warning("scheduler: nothing to schedule")

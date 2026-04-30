@@ -60,19 +60,13 @@ report:
       containers: [tanos-web, tanos-db]
 
 # Log streaming: each unique error fires once immediately, repeats are
-# collected and sent as a digest every digest_interval. The file is written
-# to storage.path and rotated when it exceeds max_size_mb.
+# collected and sent as a digest every digest_interval. Events are stored
+# in the SQLite `log_events` table — auto-pruned per retention/max_rows.
 logs:
   notifier: telegram
   digest_interval: 3600        # seconds, every hour
-  storage:
-    path: logs/blackbox.jsonl  # path relative to WorkingDirectory
-    max_size_mb: 10            # force-rotate mid-day if current file exceeds this
-    keep_archives: 30          # how many .jsonl.gz archives to keep (daily + size rollovers)
-    # Rotation policy: a new file is started on every day boundary (next append
-    # after midnight); the previous day is gzipped into
-    # logs/blackbox.YYYY-MM-DD-HHMMSS.jsonl.gz. If a single day exceeds
-    # max_size_mb, the live file is also rotated mid-day to keep size bounded.
+  retention_days: 7            # auto-delete events older than this
+  max_rows: 200000             # hard cap on the table (~100 MB SQLite)
   sources:
     - type: file
       name: nginx-error
