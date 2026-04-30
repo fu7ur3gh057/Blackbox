@@ -9,7 +9,8 @@ notifiers:
 
 # Reactive alerts: each check runs on its interval, sends to TG only on
 # transitions: ok->warn(🟡), ok/warn->crit(🔴), any->ok(🟢 resolved).
-# Stays quiet while the level doesn't change.
+# Stays quiet while the level doesn't change. Recommended interval >= 30s
+# (cpu/memory probes briefly hit psutil; sub-30s adds noise without insight).
 checks:
   - type: cpu
     name: cpu

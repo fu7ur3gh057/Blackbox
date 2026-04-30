@@ -61,7 +61,9 @@ LOCALES: dict[str, dict[str, str]] = {
         "ask_keep_tg_creds": "keep current bot token and chat id?",
         "ask_keep_proxy": "keep current proxy ({proxy})?",
         "ask_hostname": "hostname",
-        "ask_report_int": "report interval (sec)",
+        "ask_check_int": "check interval, sec — how often cpu/mem/disk/systemd run (min 30)",
+        "ask_report_int": "report interval, sec — full status digest in TG (min 30)",
+        "min_clamp": "value below {minimum}s — clamping to {minimum}s",
         "ask_warn": "warn threshold %",
         "ask_crit": "crit threshold %",
         "ask_disk_paths": "paths (comma-separated)",
@@ -150,7 +152,9 @@ LOCALES: dict[str, dict[str, str]] = {
         "ask_keep_tg_creds": "оставить текущий токен и chat id?",
         "ask_keep_proxy": "оставить текущий прокси ({proxy})?",
         "ask_hostname": "hostname",
-        "ask_report_int": "интервал репорта (сек)",
+        "ask_check_int": "интервал проверок, сек — как часто запускать cpu/mem/disk/systemd (мин. 30)",
+        "ask_report_int": "интервал репорта, сек — полный отчёт в TG (мин. 30)",
+        "min_clamp": "значение меньше {minimum}с — округляю до {minimum}с",
         "ask_warn": "warn порог %",
         "ask_crit": "crit порог %",
         "ask_disk_paths": "пути (через запятую)",
@@ -255,6 +259,20 @@ def step(label: str, work, delay: float = 0.3):
 
 def warn_line(msg: str) -> None:
     console.print(f"  [yellow]![/yellow] {msg}")
+
+
+def _ask_seconds(prompt_key: str, *, default: int, minimum: int) -> int:
+    """Ask for an interval in seconds, fall back to `default` on bad input,
+    clamp anything below `minimum` to `minimum` (and tell the user why)."""
+    raw = Prompt.ask(f"  {t(prompt_key)}", default=str(default))
+    try:
+        n = int(raw)
+    except ValueError:
+        n = default
+    if n < minimum:
+        warn_line(t("min_clamp", minimum=minimum))
+        n = minimum
+    return n
 
 
 # ── existing config helpers ─────────────────────────────────────────────────
@@ -375,7 +393,8 @@ def run_wizard() -> None:
 
     section(t("section_host"))
     hostname = Prompt.ask(f"  {t('ask_hostname')}", default=socket.gethostname())
-    report_int = Prompt.ask(f"  {t('ask_report_int')}", default="2700")
+    check_int = _ask_seconds("ask_check_int", default=60, minimum=30)
+    report_int = _ask_seconds("ask_report_int", default=2700, minimum=30)
     warn_pct = Prompt.ask(f"  {t('ask_warn')}", default="80")
     crit_pct = Prompt.ask(f"  {t('ask_crit')}", default="90")
 
@@ -400,7 +419,9 @@ def run_wizard() -> None:
 
     yaml_text = build_yaml(
         bot_token=bot_token, chat_id=chat_id, proxy=proxy_url,
-        hostname=hostname, report_interval=int(report_int),
+        hostname=hostname,
+        check_interval=check_int,
+        report_interval=report_int,
         warn_pct=int(warn_pct), crit_pct=int(crit_pct),
         disks=disks, docker_blocks=docker_blocks,
         net_cfg=net_cfg, systemd_units=systemd_units,
@@ -791,6 +812,7 @@ def build_yaml(
     chat_id: str,
     proxy: str = "",
     hostname: str,
+    check_interval: int = 60,
     report_interval: int,
     warn_pct: int,
     crit_pct: int,
@@ -814,12 +836,12 @@ notifiers:
 checks:
   - type: cpu
     name: cpu
-    interval: 60
+    interval: {check_interval}
     warn_pct: {warn_pct}
     crit_pct: {crit_pct}
   - type: memory
     name: memory
-    interval: 60
+    interval: {check_interval}
     warn_pct: {warn_pct}
     crit_pct: {crit_pct}
 """)
@@ -827,7 +849,7 @@ checks:
         parts.append(f"""\
   - type: disk
     name: disk-{_slug(d)}
-    interval: 60
+    interval: {check_interval}
     path: "{d}"
     warn_pct: {warn_pct}
     crit_pct: {crit_pct}
@@ -837,7 +859,7 @@ checks:
         parts.append(f"""\
   - type: systemd
     name: systemd-{unit_slug}
-    interval: 60
+    interval: {check_interval}
     unit: {unit}
 """)
     paths_yaml = ", ".join(f'"{d}"' for d in disks) or '"/"'
