@@ -123,38 +123,55 @@ EOF
 
     echo "  Node.js missing — installing..."
 
+    # Each branch streams stderr/stdout straight to the user — install is
+    # one-shot and the operator wants to see what's happening (and any
+    # error if it fails).
     if command -v apt-get >/dev/null 2>&1; then
         if ! command -v curl >/dev/null 2>&1; then
-            $SUDO apt-get update -qq >/dev/null 2>&1 || true
-            $SUDO apt-get install -y -qq curl ca-certificates >/dev/null 2>&1 || true
+            echo "  installing curl + ca-certificates..."
+            $SUDO apt-get update -qq || true
+            $SUDO apt-get install -y -qq curl ca-certificates || true
         fi
-        if curl -fsSL https://deb.nodesource.com/setup_20.x 2>/dev/null | $SUDO -E bash - >/dev/null 2>&1 \
-           && $SUDO apt-get install -y -qq nodejs >/dev/null 2>&1; then
-            echo "  ✓ installed node $(node --version 2>/dev/null)"
+        # Try NodeSource first (LTS 20.x); on failure fall back to
+        # Ubuntu's nodejs package — older but always works.
+        if curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -; then
+            if $SUDO apt-get install -y nodejs; then
+                echo "  ✓ installed node $(node --version 2>/dev/null)"
+                return 0
+            fi
+        fi
+        echo "  NodeSource failed; falling back to distro repo (older Node)..."
+        $SUDO apt-get update -qq || true
+        if $SUDO apt-get install -y nodejs npm; then
+            echo "  ✓ installed node $(node --version 2>/dev/null) (distro)"
             return 0
         fi
 
     elif command -v dnf >/dev/null 2>&1; then
-        if curl -fsSL https://rpm.nodesource.com/setup_20.x 2>/dev/null | $SUDO bash - >/dev/null 2>&1 \
-           && $SUDO dnf install -y nodejs >/dev/null 2>&1; then
+        if curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash - \
+           && $SUDO dnf install -y nodejs; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
+        $SUDO dnf install -y nodejs npm && {
+            echo "  ✓ installed node $(node --version 2>/dev/null) (distro)"
+            return 0
+        }
     elif command -v yum >/dev/null 2>&1; then
-        if curl -fsSL https://rpm.nodesource.com/setup_20.x 2>/dev/null | $SUDO bash - >/dev/null 2>&1 \
-           && $SUDO yum install -y nodejs >/dev/null 2>&1; then
+        if curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash - \
+           && $SUDO yum install -y nodejs; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
 
     elif command -v pacman >/dev/null 2>&1; then
-        if $SUDO pacman -Sy --noconfirm nodejs npm >/dev/null 2>&1; then
+        if $SUDO pacman -Sy --noconfirm nodejs npm; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
 
     elif command -v apk >/dev/null 2>&1; then
-        if $SUDO apk add --no-cache nodejs npm >/dev/null 2>&1; then
+        if $SUDO apk add --no-cache nodejs npm; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
@@ -162,10 +179,10 @@ EOF
 
     cat >&2 <<'EOF'
 
-Failed to auto-install Node.js. Install it manually with your package
-manager, then re-run. The client build will be skipped this run; the
-daemon will still start (you'll see a placeholder page until the bundle
-is built).
+Failed to auto-install Node.js. The error is above; install Node manually
+with your package manager and re-run. The client build will be skipped
+this run; the daemon still starts (you'll see a placeholder page until
+the bundle is built).
 
 EOF
     return 1
