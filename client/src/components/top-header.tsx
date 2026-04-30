@@ -21,11 +21,9 @@ export function TopHeader() {
 
   return (
     <header className="flex items-center justify-between gap-4 px-7 py-5">
-      {/* wordmark — terminal prompt, white text */}
-      <div className="flex items-baseline gap-2 font-mono">
-        <span className="text-accent-pale text-base">$</span>
+      {/* wordmark — clean monospace, no decorative chars */}
+      <div className="font-mono">
         <span className="text-lg tracking-tight text-ink-strong">blackbox</span>
-        <span className="text-accent-pale cursor-blink text-base">_</span>
       </div>
 
       {/* right cluster */}
