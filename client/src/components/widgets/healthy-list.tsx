@@ -1,10 +1,8 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
-import type { CheckSummary } from "@/lib/types";
+import { useChecksSnapshot } from "@/lib/use-snapshot";
 import { cn, relativeTime } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { Cpu, HardDrive, MemoryStick, Network, Server, Activity } from "lucide-react";
 
 const ICON_BY_TYPE: Record<string, React.ElementType> = {
@@ -16,12 +14,7 @@ const ICON_BY_TYPE: Record<string, React.ElementType> = {
  * are fine right now. Reads /api/checks and filters to ok+null levels.
  */
 export function HealthyList() {
-  const { data = [] } = useQuery({
-    queryKey: ["checks"],
-    queryFn: () => api.get<CheckSummary[]>("/checks"),
-    refetchInterval: 30_000,
-  });
-
+  const data = useChecksSnapshot() ?? [];
   const calm = data.filter((c) => c.level === "ok" || c.level == null);
 
   return (

@@ -1,17 +1,10 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
+import { useDockerSnapshot } from "@/lib/use-snapshot";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
-import { Boxes, AlertCircle } from "lucide-react";
-
-interface DockerProject {
-  compose: string;
-  project: string;
-  containers: Array<{ Service?: string; Name?: string; State?: string; Status?: string }>;
-  error: string | null;
-}
+import { Boxes, AlertCircle, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 const STATE_DOT: Record<string, string> = {
   running:    "bg-level-ok",
@@ -26,19 +19,23 @@ const STATE_DOT: Record<string, string> = {
  * borders. Clean & dense, three across.
  */
 export function WatchCards() {
-  const { data = [] } = useQuery({
-    queryKey: ["docker"],
-    queryFn: () => api.get<DockerProject[]>("/docker"),
-    refetchInterval: 20_000,
-  });
+  const data = useDockerSnapshot() ?? [];
 
   return (
-    <Panel>
+    <Link
+      href="/docker"
+      className="block group focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-pale/50 rounded-card"
+      aria-label="Open docker page"
+    >
+    <Panel className="transition-colors group-hover:border-accent-pale/30">
       <PanelHeader className="flex items-center justify-between pb-2">
         <PanelTitle className="flex items-center gap-2">
           <Boxes size={14} className="text-accent-pale" /> Ongoing services
         </PanelTitle>
-        <span className="text-[10px] text-ink-mute">{data.length} project{data.length === 1 ? "" : "s"}</span>
+        <span className="inline-flex items-center gap-1 text-[10px] text-ink-mute group-hover:text-accent-pale transition-colors">
+          {data.length} project{data.length === 1 ? "" : "s"}
+          <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
+        </span>
       </PanelHeader>
       <PanelBody className="pt-2">
         {data.length === 0 && (
@@ -110,5 +107,6 @@ export function WatchCards() {
         </div>
       </PanelBody>
     </Panel>
+    </Link>
   );
 }

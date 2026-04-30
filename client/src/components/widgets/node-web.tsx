@@ -1,9 +1,8 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
 import type { CheckSummary, Level } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
+import { useChecksSnapshot } from "@/lib/use-snapshot";
 
 const LEVEL: Record<Level, { fill: string; ring: string; glowColor: string }> = {
   ok:   { fill: "#B5D17A", ring: "#B5D17A", glowColor: "rgba(181,209,122,0.55)" },
@@ -38,12 +37,7 @@ const ORBIT_R = 76;
  *     (also via animateTransform, GPU-friendly)
  */
 export function NodeWeb() {
-  const { data } = useQuery({
-    queryKey: ["checks"],
-    queryFn: () => api.get<CheckSummary[]>("/checks"),
-    refetchInterval: 15_000,
-  });
-
+  const data = useChecksSnapshot();
   const checks = data && data.length > 0 ? data : DUMMY;
   const n = checks.length;
   const isPreview = !data || data.length === 0;
@@ -123,7 +117,7 @@ export function NodeWeb() {
                     strokeLinecap="round"
                   />
                   {/* packet — travels centre → node, loops */}
-                  <circle r="1.4" fill="#E8FF8F" opacity="0.9" filter="url(#)">
+                  <circle r="1.4" fill="#E8FF8F" opacity="0.9">
                     <animateMotion
                       dur={`${dur}s`}
                       begin={`-${delay}s`}

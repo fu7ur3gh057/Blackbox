@@ -1,8 +1,9 @@
 "use client";
 
 import { api } from "@/lib/api";
-import { connectNamespace } from "@/lib/socket";
-import type { AlertEvent, CheckSummary, Level, NotifierInfo, SystemSnapshot } from "@/lib/types";
+import { connectNamespace, releaseNamespace } from "@/lib/socket";
+import type { AlertEvent, CheckSummary, Level, NotifierInfo } from "@/lib/types";
+import { useChecksSnapshot, useSystemSnapshot } from "@/lib/use-snapshot";
 import { useWsStatus } from "@/lib/use-ws-status";
 import { cn, relativeTime } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -95,11 +96,7 @@ function ServerClock() {
 }
 
 function WorstLevelPill() {
-  const { data = [] } = useQuery({
-    queryKey: ["checks"],
-    queryFn: () => api.get<CheckSummary[]>("/checks"),
-    refetchInterval: 15_000,
-  });
+  const data = useChecksSnapshot() ?? [];
   const buckets = data.reduce(
     (acc, c) => {
       const lvl = c.level ?? "none";
@@ -139,11 +136,7 @@ function WorstLevelPill() {
 // ── mini gauges ───────────────────────────────────────────────────────────
 
 function MiniGauges() {
-  const { data } = useQuery({
-    queryKey: ["system"],
-    queryFn: () => api.get<SystemSnapshot>("/system"),
-    refetchInterval: 5_000,
-  });
+  const data = useSystemSnapshot();
   return (
     <div className="grid grid-cols-3 gap-3">
       <Gauge label="CPU"  value={data?.cpu_pct    ?? 0} />
@@ -194,13 +187,17 @@ function RecentAlertsFeed() {
 
   useEffect(() => {
     const sock = connectNamespace("/alerts");
-    sock.on("alert:fired", (payload: Omit<AlertEvent, "id">) => {
+    const onFired = (payload: Omit<AlertEvent, "id">) => {
       qc.setQueryData<AlertEvent[]>(["alerts", { limit: 20 }], (cur) => {
         const next: AlertEvent = { id: Date.now(), ...payload };
         return [next, ...(cur ?? [])].slice(0, 20);
       });
-    });
-    return () => { sock.disconnect(); };
+    };
+    sock.on("alert:fired", onFired);
+    return () => {
+      sock.off("alert:fired", onFired);
+      releaseNamespace("/alerts");
+    };
   }, [qc]);
 
   return (

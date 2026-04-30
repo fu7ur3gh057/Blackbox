@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { connectNamespace } from "@/lib/socket";
+import { connectNamespace, releaseNamespace } from "@/lib/socket";
 
 export type WsState = "connecting" | "online" | "offline";
 
@@ -38,7 +38,7 @@ export function useWsStatus(): WsState {
       sock.off("connect", onConnect);
       sock.off("disconnect", onDisconnect);
       sock.off("connect_error", onError);
-      sock.disconnect();
+      releaseNamespace("/alerts");
     };
   }, []);
 

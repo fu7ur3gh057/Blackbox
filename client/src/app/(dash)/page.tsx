@@ -2,6 +2,7 @@ import { Reveal } from "@/components/reveal";
 import { GaugeMeter } from "@/components/widgets/gauge-meter";
 import { HealthyList } from "@/components/widgets/healthy-list";
 import { Heartbeat } from "@/components/widgets/heartbeat";
+import { LogsTeaser } from "@/components/widgets/logs-teaser";
 import { NodeWeb } from "@/components/widgets/node-web";
 import { PixelGrid } from "@/components/widgets/pixel-grid";
 import { ServerLocation } from "@/components/widgets/server-location";
@@ -40,8 +41,9 @@ export default function Dashboard() {
         <Reveal delay={1000}><PixelGrid /></Reveal>
       </div>
 
-      <Reveal delay={1300}><WatchCards /></Reveal>
-      <Reveal delay={1600}><ServerLocation /></Reveal>
+      <Reveal delay={1200}><LogsTeaser /></Reveal>
+      <Reveal delay={1500}><WatchCards /></Reveal>
+      <Reveal delay={1800}><ServerLocation /></Reveal>
     </div>
   );
 }

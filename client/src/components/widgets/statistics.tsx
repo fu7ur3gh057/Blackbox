@@ -2,7 +2,7 @@
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
-import { connectNamespace } from "@/lib/socket";
+import { connectNamespace, releaseNamespace } from "@/lib/socket";
 import type { CheckResult } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,12 +47,16 @@ export function Statistics() {
 
   useEffect(() => {
     const sock = connectNamespace("/checks");
-    sock.on("check:result", (p: { name: string }) => {
+    const onResult = (p: { name: string }) => {
       if (p.name === "cpu" || p.name === "memory") {
         qc.invalidateQueries({ queryKey: ["checks", p.name, "history"] });
       }
-    });
-    return () => { sock.disconnect(); };
+    };
+    sock.on("check:result", onResult);
+    return () => {
+      sock.off("check:result", onResult);
+      releaseNamespace("/checks");
+    };
   }, [qc]);
 
   const points = useMemo(() => {

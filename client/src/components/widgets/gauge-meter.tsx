@@ -1,127 +1,114 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
-import type { SystemSnapshot } from "@/lib/types";
+import { useSystemSnapshot } from "@/lib/use-snapshot";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 
 /**
- * Half-circle speedometer. Needle rotates from -90° (0 %) to +90° (100 %).
- * The colored arc fills in proportional to the value via stroke-dasharray;
- * tick marks sit just outside the arc; centred metric below.
+ * Compact CPU dial. Half-circle gauge on the left, metric column on
+ * the right. Smaller than the previous 360-px card so it pairs cleanly
+ * with PixelGrid in a 2-up row.
  */
 export function GaugeMeter() {
-  const { data } = useQuery({
-    queryKey: ["system"],
-    queryFn: () => api.get<SystemSnapshot>("/system"),
-    refetchInterval: 5_000,
-  });
+  const data = useSystemSnapshot();
   const pct = Math.max(0, Math.min(100, data?.cpu_pct ?? 0));
   const needleAngle = -90 + (pct / 100) * 180;
+  const ARC_LEN = Math.PI * 80;
+  const filled = (pct / 100) * ARC_LEN;
 
-  // The arc sweeps a half circle: r=80 → length = πr ≈ 251.3
-  const ARC_LENGTH = Math.PI * 80;
-  const filled = (pct / 100) * ARC_LENGTH;
-
-  const tone =
-    pct >= 90 ? "crit" : pct >= 70 ? "warn" : "ok";
-  const TONE: Record<string, { stroke: string; glow: string; label: string }> = {
-    ok:   { stroke: "url(#gauge-ok)",   glow: "rgba(181,209,122,0.55)", label: "text-accent-pale" },
-    warn: { stroke: "url(#gauge-warn)", glow: "rgba(251,191,36,0.55)",  label: "text-level-warn" },
-    crit: { stroke: "url(#gauge-crit)", glow: "rgba(252,165,165,0.6)",  label: "text-level-crit" },
+  const tone = pct >= 90 ? "crit" : pct >= 70 ? "warn" : "ok";
+  const TONE: Record<string, { stroke: string; glow: string; label: string; pill: string }> = {
+    ok:   { stroke: "url(#g-ok)",   glow: "rgba(181,209,122,0.55)", label: "text-accent-pale",  pill: "bg-accent-pale/[0.12] text-accent-pale border-accent-pale/30" },
+    warn: { stroke: "url(#g-warn)", glow: "rgba(253,230,138,0.55)", label: "text-level-warn",   pill: "bg-level-warn/10 text-level-warn border-level-warn/30" },
+    crit: { stroke: "url(#g-crit)", glow: "rgba(252,165,165,0.6)",  label: "text-level-crit",   pill: "bg-level-crit/10 text-level-crit border-level-crit/30" },
   };
 
   return (
     <Panel className="overflow-hidden">
-      <PanelHeader className="pb-1">
-        <div className="flex items-center justify-between">
-          <PanelTitle className="text-[13px]">CPU load</PanelTitle>
-          <span className="pill-ghost">{tone}</span>
-        </div>
+      <PanelHeader className="flex items-center justify-between pb-2">
+        <PanelTitle className="text-[13px]">CPU load</PanelTitle>
+        <span className={cn("pill border font-mono uppercase", TONE[tone].pill)}>{tone}</span>
       </PanelHeader>
-      <PanelBody className="pt-3 flex flex-col items-center">
-        <svg viewBox="0 0 200 130" className="w-full max-w-[260px]">
-          <defs>
-            <linearGradient id="gauge-ok" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#B5D17A" />
-              <stop offset="100%" stopColor="#B5D17A" />
-            </linearGradient>
-            <linearGradient id="gauge-warn" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#B5D17A" />
-              <stop offset="100%" stopColor="#FDE68A" />
-            </linearGradient>
-            <linearGradient id="gauge-crit" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#FDE68A" />
-              <stop offset="100%" stopColor="#FCA5A5" />
-            </linearGradient>
-            <radialGradient id="gauge-hub" cx="50%" cy="50%" r="50%">
-              <stop offset="0%"   stopColor="#1A1D25" />
-              <stop offset="100%" stopColor="#0A0B0F" />
-            </radialGradient>
-          </defs>
-
-          {/* track */}
-          <path
-            d="M 20 100 A 80 80 0 0 1 180 100"
-            stroke="#1A1D25" fill="none" strokeWidth="14" strokeLinecap="round"
-          />
-          {/* filled arc */}
-          <path
-            d="M 20 100 A 80 80 0 0 1 180 100"
-            stroke={TONE[tone].stroke}
-            fill="none"
-            strokeWidth="14"
-            strokeLinecap="round"
-            strokeDasharray={`${filled} ${ARC_LENGTH}`}
-            style={{ filter: `drop-shadow(0 0 10px ${TONE[tone].glow})`, transition: "stroke-dasharray 0.6s ease-out" }}
-          />
-
-          {/* tick marks */}
-          {Array.from({ length: 11 }).map((_, i) => {
-            const angle = -180 + i * 18;
-            const r1 = 70;
-            const r2 = i % 5 === 0 ? 60 : 64;
-            const rad = (angle * Math.PI) / 180;
-            return (
-              <line
-                key={i}
-                x1={100 + r1 * Math.cos(rad)}
-                y1={100 + r1 * Math.sin(rad)}
-                x2={100 + r2 * Math.cos(rad)}
-                y2={100 + r2 * Math.sin(rad)}
-                stroke="#3a3d4a"
-                strokeWidth={i % 5 === 0 ? 1.6 : 1}
-              />
-            );
-          })}
-
-          {/* needle */}
-          <g
-            className="gauge-needle"
-            style={{ transform: `rotate(${needleAngle}deg)`, transformOrigin: "100px 100px" }}
-          >
+      <PanelBody className="pt-1 pb-4">
+        <div className="grid grid-cols-[150px_1fr] gap-4 items-center">
+          {/* compact dial */}
+          <svg viewBox="0 0 200 120" className="w-full">
             <defs>
-              <linearGradient id="needle-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#F0E5CC" />
-                <stop offset="100%" stopColor="#B5D17A" />
+              <linearGradient id="g-ok"   x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#B5D17A" /><stop offset="100%" stopColor="#E8FF8F" />
               </linearGradient>
+              <linearGradient id="g-warn" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#B5D17A" /><stop offset="100%" stopColor="#FDE68A" />
+              </linearGradient>
+              <linearGradient id="g-crit" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#FDE68A" /><stop offset="100%" stopColor="#FCA5A5" />
+              </linearGradient>
+              <radialGradient id="g-hub" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#1A1D25" /><stop offset="100%" stopColor="#0A0B0F" />
+              </radialGradient>
             </defs>
-            <path d="M 100 35 L 96 100 L 104 100 Z" fill="url(#needle-grad)" />
-            <circle cx="100" cy="100" r="8" fill="url(#gauge-hub)" stroke="#B5D17A" strokeWidth="1.5" />
-            <circle cx="100" cy="100" r="2.5" fill="#F0E5CC" />
-          </g>
-        </svg>
 
-        <div className="mt-1 text-center">
-          <div className={cn("text-[40px] leading-none font-semibold tabular-nums", TONE[tone].label)}>
-            {pct.toFixed(1)}<span className="text-[18px] text-ink-mute">%</span>
-          </div>
-          <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-ink-mute">
-            load 1m {data?.load_1m?.toFixed(2) ?? "—"}
+            {/* track + filled arc */}
+            <path d="M 20 100 A 80 80 0 0 1 180 100"
+              stroke="#1A1D25" fill="none" strokeWidth="10" strokeLinecap="round" />
+            <path d="M 20 100 A 80 80 0 0 1 180 100"
+              stroke={TONE[tone].stroke} fill="none" strokeWidth="10" strokeLinecap="round"
+              strokeDasharray={`${filled} ${ARC_LEN}`}
+              style={{ filter: `drop-shadow(0 0 8px ${TONE[tone].glow})`, transition: "stroke-dasharray 0.6s ease-out" }}
+            />
+
+            {/* labelled major ticks at 0/25/50/75/100 */}
+            {[0, 25, 50, 75, 100].map((v) => {
+              const a = (-180 + (v / 100) * 180) * Math.PI / 180;
+              return (
+                <g key={v}>
+                  <line
+                    x1={100 + 70 * Math.cos(a)} y1={100 + 70 * Math.sin(a)}
+                    x2={100 + 60 * Math.cos(a)} y2={100 + 60 * Math.sin(a)}
+                    stroke="#3a3d4a" strokeWidth="1.4"
+                  />
+                  <text
+                    x={100 + 50 * Math.cos(a)} y={100 + 50 * Math.sin(a) + 3}
+                    textAnchor="middle" fontSize="9" fill="#6E6E7A"
+                    fontFamily="ui-monospace, monospace"
+                  >{v}</text>
+                </g>
+              );
+            })}
+
+            {/* needle */}
+            <g className="gauge-needle"
+              style={{ transform: `rotate(${needleAngle}deg)`, transformOrigin: "100px 100px" }}>
+              <path d="M 100 38 L 97 100 L 103 100 Z" fill="#F0E5CC" />
+              <circle cx="100" cy="100" r="6" fill="url(#g-hub)" stroke="#B5D17A" strokeWidth="1" />
+              <circle cx="100" cy="100" r="2" fill="#FFFFFF" />
+            </g>
+          </svg>
+
+          {/* metric column — mono digits */}
+          <div className="font-mono">
+            <div className={cn("leading-none", TONE[tone].label)}>
+              <span className="text-[26px] font-semibold tabular-nums">{pct.toFixed(1)}</span>
+              <span className="text-[12px] text-ink-mute ml-1">%</span>
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-ink-mute mt-3">load avg</div>
+            <div className="grid grid-cols-3 gap-1.5 mt-1.5 text-[11px]">
+              <Triple label="1m"  value={data?.load_1m  ?? 0} />
+              <Triple label="5m"  value={data?.load_5m  ?? 0} />
+              <Triple label="15m" value={data?.load_15m ?? 0} />
+            </div>
           </div>
         </div>
       </PanelBody>
     </Panel>
+  );
+}
+
+function Triple({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="text-ink-mute text-[9px]">{label}</div>
+      <div className="text-ink-strong tabular-nums">{value.toFixed(2)}</div>
+    </div>
   );
 }

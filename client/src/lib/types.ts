@@ -78,3 +78,49 @@ export interface LogSignature {
   first_seen: number;
   total: number;
 }
+
+// ── docker ───────────────────────────────────────────────────────────
+
+export type DockerState =
+  | "running" | "exited" | "paused" | "restarting" | "created" | "dead";
+
+export interface DockerPort {
+  URL: string;
+  TargetPort: number;
+  PublishedPort: number;
+  Protocol: string;
+}
+
+export interface DockerContainer {
+  ID: string;
+  Name: string;
+  Image: string;
+  Service: string;
+  Project: string;
+  Created: number;
+  State: DockerState | string;
+  Status: string;
+  Health: "healthy" | "unhealthy" | "starting" | "" | string;
+  ExitCode: number;
+  Publishers: DockerPort[] | null;
+}
+
+export interface DockerProject {
+  compose: string;
+  project: string;
+  wanted: string[];
+  starred: string[];
+  containers: DockerContainer[];
+  error: string | null;
+}
+
+export interface DockerEvent {
+  ts: number;
+  action: string;
+  id: string;
+  image: string;
+  container: string;
+  project: string;
+  service: string;
+  exit_code: number | null;
+}

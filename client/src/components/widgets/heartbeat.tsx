@@ -1,11 +1,9 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
-import { api } from "@/lib/api";
-import { connectNamespace } from "@/lib/socket";
-import type { SystemSnapshot } from "@/lib/types";
+import { connectNamespace, releaseNamespace } from "@/lib/socket";
+import { useSystemSnapshot } from "@/lib/use-snapshot";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
 import { Activity } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,11 +18,7 @@ export function Heartbeat() {
   const [beatTrigger, setBeatTrigger] = useState(0);
   const beatTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  const { data } = useQuery({
-    queryKey: ["system"],
-    queryFn: () => api.get<SystemSnapshot>("/system"),
-    refetchInterval: 5_000,
-  });
+  const data = useSystemSnapshot();
 
   useEffect(() => {
     if (!data) return;
@@ -35,12 +29,16 @@ export function Heartbeat() {
 
   useEffect(() => {
     const sock = connectNamespace("/checks");
-    sock.on("check:result", () => {
+    const onResult = () => {
       setBeatTrigger((n) => n + 1);
       if (beatTimerRef.current) clearTimeout(beatTimerRef.current);
       beatTimerRef.current = setTimeout(() => setBeatTrigger((n) => n), 600);
-    });
-    return () => { sock.disconnect(); };
+    };
+    sock.on("check:result", onResult);
+    return () => {
+      sock.off("check:result", onResult);
+      releaseNamespace("/checks");
+    };
   }, []);
 
   // ECG cycle (200 wide). Repeat 4 times for the 800-wide path that
