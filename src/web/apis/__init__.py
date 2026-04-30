@@ -1,6 +1,3 @@
-from fastapi import APIRouter
+from web.apis.router import api_router
 
-from web.apis import status
-
-api_router = APIRouter()
-api_router.include_router(status.router)
+__all__ = ["api_router"]

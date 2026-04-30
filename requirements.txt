@@ -8,6 +8,12 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 taskiq>=0.11
 
+# Optional: подцепим, когда переключим брокер с InMemoryBroker на Redis
+# или подключим Socket.IO. Файлы services/redis/, web/sockets/ ссылаются
+# на эти пакеты, но в основном пути они не импортируются.
+redis>=5.0
+python-socketio>=5.11
+
 # dev / test
 pytest>=8.0
 pytest-asyncio>=0.23
