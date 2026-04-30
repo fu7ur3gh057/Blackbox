@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import shutil
 import socket
 import subprocess
@@ -92,14 +93,21 @@ LOCALES: dict[str, dict[str, str]] = {
         "systemd_pick": "Which services to alert on if they go down?",
         "systemd_none": "no user services detected",
         "section_web": "Web client (FastAPI)",
-        "ask_web_yn": "expose the web client (Swagger + API)?",
+        "ask_web_yn": "expose the web client (Swagger + admin API)?",
         "ask_web_port": "  port",
+        "ask_web_username": "  admin username",
+        "ask_web_password": "  admin password (8+ chars)",
+        "ask_web_password_confirm": "  repeat password",
+        "ask_web_keep_user": "found existing admin user '{username}' — keep current password?",
+        "web_password_short": "password too short, min 8 chars — try again",
+        "web_password_mismatch": "passwords don't match — try again",
         "web_url_hint": "after start: http://<vps-ip>:{port}/blackbox/api/docs",
         "web_summary_header": "Web client URLs (paste into browser):",
         "web_summary_swagger": "  Swagger UI:   {url}",
         "web_summary_redoc":   "  ReDoc:        {url}",
         "web_summary_openapi": "  OpenAPI JSON: {url}",
         "web_summary_health":  "  Healthcheck:  {url}",
+        "web_summary_login":   "  login as:     {username}",
         "web_summary_firewall": "if it doesn't open — open port {port} in your VPS firewall (ufw allow {port}, or your provider's panel)",
         "warn_not_found": "{path} not found, including anyway",
         "step_backup": "backing up to {name}",
@@ -183,14 +191,21 @@ LOCALES: dict[str, dict[str, str]] = {
         "systemd_pick": "Какие сервисы алертить при падении?",
         "systemd_none": "пользовательских сервисов не найдено",
         "section_web": "Веб-клиент (FastAPI)",
-        "ask_web_yn": "поднимать веб-клиент (Swagger + API)?",
+        "ask_web_yn": "поднимать веб-клиент (Swagger + admin API)?",
         "ask_web_port": "  порт",
+        "ask_web_username": "  логин админа",
+        "ask_web_password": "  пароль админа (8+ символов)",
+        "ask_web_password_confirm": "  повтори пароль",
+        "ask_web_keep_user": "найден админ '{username}' — оставить текущий пароль?",
+        "web_password_short": "слишком короткий пароль (минимум 8 символов) — попробуй ещё",
+        "web_password_mismatch": "пароли не совпадают — попробуй ещё",
         "web_url_hint": "после старта: http://<ip-впс>:{port}/blackbox/api/docs",
         "web_summary_header": "URL'ы веб-клиента (вставь в браузер):",
         "web_summary_swagger": "  Swagger UI:   {url}",
         "web_summary_redoc":   "  ReDoc:        {url}",
         "web_summary_openapi": "  OpenAPI JSON: {url}",
         "web_summary_health":  "  Healthcheck:  {url}",
+        "web_summary_login":   "  логин:        {username}",
         "web_summary_firewall": "если не открывается — открой порт {port} в фаерволе VPS (ufw allow {port} или в панели хостера)",
         "warn_not_found": "{path} не найден, добавляю всё равно",
         "step_backup": "бэкаплю в {name}",
@@ -615,8 +630,9 @@ def configure_systemd() -> list[str]:
 # ── web client ─────────────────────────────────────────────────────────────
 
 def configure_web() -> dict | None:
-    """Ask whether to expose the web client and on which port. Returns
-    {'enabled': True, 'port': N} or None if the user declines."""
+    """Ask whether to expose the web client + create an admin user. Returns
+    a dict ready to splice into config.yaml — {enabled, port, user, jwt} —
+    or None if the user declines."""
     if not Confirm.ask(f"  {t('ask_web_yn')}", default=False):
         return None
     port_str = Prompt.ask(f"{t('ask_web_port')}", default="8765")
@@ -624,8 +640,69 @@ def configure_web() -> dict | None:
         port = int(port_str)
     except ValueError:
         port = 8765
+
+    user_block, jwt_block = _gather_web_user()
     console.print(f"  [dim italic]{t('web_url_hint', port=port)}[/dim italic]")
-    return {"enabled": True, "port": port}
+    return {
+        "enabled": True,
+        "port": port,
+        "user": user_block,
+        "jwt": jwt_block,
+    }
+
+
+def _gather_web_user() -> tuple[dict, dict]:
+    """Returns (user_dict, jwt_dict). Reuses existing creds if present and the
+    operator confirms — otherwise hashes a fresh password and rotates the
+    JWT secret (which invalidates any existing sessions, intentional)."""
+    import bcrypt
+
+    existing = _load_existing_web_user()
+    if existing and Confirm.ask(
+        f"  {t('ask_web_keep_user', username=existing['user']['username'])}",
+        default=True,
+    ):
+        return existing["user"], existing["jwt"]
+
+    default_user = (existing or {}).get("user", {}).get("username", "admin")
+    username = Prompt.ask(f"{t('ask_web_username')}", default=default_user) or "admin"
+
+    while True:
+        password = Prompt.ask(f"{t('ask_web_password')}", password=True)
+        if len(password) < 8:
+            warn_line(t("web_password_short"))
+            continue
+        confirm = Prompt.ask(f"{t('ask_web_password_confirm')}", password=True)
+        if password != confirm:
+            warn_line(t("web_password_mismatch"))
+            continue
+        break
+
+    password_hash = bcrypt.hashpw(
+        password.encode("utf-8"), bcrypt.gensalt(),
+    ).decode("utf-8")
+    jwt_secret = secrets.token_hex(32)
+    return (
+        {"username": username, "password_hash": password_hash},
+        {"secret": jwt_secret, "expiry_seconds": 7 * 24 * 3600},
+    )
+
+
+def _load_existing_web_user() -> dict | None:
+    """Read web.user/jwt from a prior config.yaml so re-runs don't force a
+    password reset every time."""
+    if not CONFIG_FILE.exists():
+        return None
+    try:
+        raw = yaml.safe_load(CONFIG_FILE.read_text()) or {}
+    except Exception:
+        return None
+    web = raw.get("web") or {}
+    user = web.get("user") or {}
+    jwt_blk = web.get("jwt") or {}
+    if user.get("username") and user.get("password_hash"):
+        return {"user": user, "jwt": jwt_blk}
+    return None
 
 
 def detect_public_ip() -> str:
@@ -656,6 +733,7 @@ def print_web_summary(web_cfg: dict | None) -> None:
     if not web_cfg or not web_cfg.get("enabled"):
         return
     port = int(web_cfg.get("port", 8765))
+    username = (web_cfg.get("user") or {}).get("username", "admin")
     ip = detect_public_ip()
     base = f"http://{ip}:{port}/blackbox"
 
@@ -665,6 +743,7 @@ def print_web_summary(web_cfg: dict | None) -> None:
     console.print(t("web_summary_redoc",   url=f"[cyan]{base}/api/redoc[/cyan]"))
     console.print(t("web_summary_openapi", url=f"[cyan]{base}/api/openapi.json[/cyan]"))
     console.print(t("web_summary_health",  url=f"[cyan]{base}/health[/cyan]"))
+    console.print(t("web_summary_login",   username=f"[bold cyan]{username}[/bold cyan]"))
     console.print(f"  [dim italic]{t('web_summary_firewall', port=port)}[/dim italic]")
 
 
@@ -890,12 +969,24 @@ report:
 
     if web_cfg and web_cfg.get("enabled"):
         port = int(web_cfg.get("port", 8765))
+        user = web_cfg.get("user") or {}
+        jwt_blk = web_cfg.get("jwt") or {}
+        username = user.get("username", "admin")
+        pw_hash = user.get("password_hash", "")
+        secret = jwt_blk.get("secret", "")
+        expiry = int(jwt_blk.get("expiry_seconds", 7 * 24 * 3600))
         parts.append(f"""
 web:
   enabled: true
   host: 0.0.0.0
   port: {port}
   prefix: /blackbox
+  user:
+    username: {username}
+    password_hash: "{pw_hash}"
+  jwt:
+    secret: "{secret}"
+    expiry_seconds: {expiry}
 """)
     return "".join(parts)
 

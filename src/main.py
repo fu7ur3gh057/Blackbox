@@ -51,6 +51,10 @@ async def _run(config: Config, *, web_enabled: bool) -> None:
 
     ctx = await init_broker(config)
 
+    if web_enabled:
+        from web.auth.lifetime import init_auth
+        init_auth(config)
+
     for n in ctx.notifiers:
         try:
             await n.send_startup()

@@ -11,3 +11,8 @@ config.yaml.bak
 /data/
 .idea/
 .vscode/
+
+# binary assets — keep out of repo
+client/*.png
+client/*.jpg
+client/*.jpeg
