@@ -1,6 +1,89 @@
 #!/usr/bin/env bash
 # Sourced by setup.sh / install-service.sh / install-cli.sh / uninstall-service.sh.
 # Picks a Python >= 3.10, creates the venv if missing, syncs deps.
+#
+# Every install action is preceded by a confirm prompt with an honest
+# disk-size estimate. Set BLACKBOX_YES=1 to skip all prompts (CI / --yes
+# style automation).
+
+
+# ── prompt helpers ────────────────────────────────────────────────────
+
+
+_bb_color() {
+    # Colors only when stdout is a TTY — keeps logs clean.
+    if [ -t 1 ]; then
+        case "$1" in
+            cyan)   printf '\033[36m';;
+            yellow) printf '\033[33m';;
+            green)  printf '\033[32m';;
+            dim)    printf '\033[2m';;
+            bold)   printf '\033[1m';;
+            reset)  printf '\033[0m';;
+        esac
+    fi
+}
+
+
+# Pretty-print one install step before asking the user to confirm.
+# Args: 1=label, 2=size estimate (e.g. "~80 MB"), 3=details
+_bb_install_card() {
+    local label="$1" size="$2" detail="$3"
+    printf '\n  %s%s%s' "$(_bb_color cyan)" "$label" "$(_bb_color reset)"
+    printf '   %s%s%s\n' "$(_bb_color dim)" "$size" "$(_bb_color reset)"
+    if [ -n "$detail" ]; then
+        printf '  %s%s%s\n' "$(_bb_color dim)" "$detail" "$(_bb_color reset)"
+    fi
+}
+
+
+# Yes/No confirm. Default Yes — Enter alone proceeds. BLACKBOX_YES=1 skips.
+# Returns 0 on yes / 1 on no.
+_bb_confirm() {
+    local prompt="$1"
+    if [ "${BLACKBOX_YES:-}" = "1" ]; then
+        printf '  %s [Y/n] auto-yes (BLACKBOX_YES=1)\n' "$prompt"
+        return 0
+    fi
+    if [ ! -t 0 ]; then
+        # No interactive stdin — proceed silently; install scripts shouldn't
+        # block in CI when running via `bash <(curl ...)` either.
+        printf '  %s [Y/n] auto-yes (non-interactive stdin)\n' "$prompt"
+        return 0
+    fi
+    local reply
+    printf '  %s %s[Y/n]%s ' "$prompt" "$(_bb_color dim)" "$(_bb_color reset)"
+    read -r reply </dev/tty
+    case "$reply" in
+        ""|y|Y|yes|YES) return 0 ;;
+        *)              return 1 ;;
+    esac
+}
+
+
+# Same as _bb_confirm but DEFAULT NO — for destructive operations.
+_bb_confirm_destructive() {
+    local prompt="$1"
+    if [ "${BLACKBOX_YES:-}" = "1" ]; then
+        printf '  %s [y/N] auto-yes (BLACKBOX_YES=1)\n' "$prompt"
+        return 0
+    fi
+    if [ ! -t 0 ]; then
+        printf '  %s [y/N] declined (non-interactive)\n' "$prompt"
+        return 1
+    fi
+    local reply
+    printf '  %s %s[y/N]%s ' "$prompt" "$(_bb_color dim)" "$(_bb_color reset)"
+    read -r reply </dev/tty
+    case "$reply" in
+        y|Y|yes|YES) return 0 ;;
+        *)           return 1 ;;
+    esac
+}
+
+
+# ── Python venv + deps ────────────────────────────────────────────────
+
 
 ensure_venv() {
     local PROJECT_ROOT="$1"
@@ -41,7 +124,15 @@ EOF
     cd "$PROJECT_ROOT" || return 1
 
     if [ ! -x .venv/bin/python ]; then
-        echo "  creating venv with $PYTHON..."
+        _bb_install_card \
+            "Python venv ($PYTHON)" \
+            "~50 MB" \
+            "creates ./.venv with isolated interpreter + pip"
+        if ! _bb_confirm "create venv now?"; then
+            echo "  declined — re-run when ready" >&2
+            return 1
+        fi
+        echo "  creating venv..."
         if ! "$PYTHON" -m venv .venv; then
             cat >&2 <<EOF
 
@@ -72,19 +163,29 @@ EOF
         fi
     fi
 
-    # Use 'python -m pip' instead of '.venv/bin/pip' — works even if the pip
-    # entrypoint script is broken or absent but the pip module is importable.
+    # Sync Python deps. Only ask if the install actually has work to do
+    # (saves the operator from confirming a 1-second no-op every run).
+    if .venv/bin/python -m pip install --dry-run -q -r requirements.txt 2>/dev/null \
+       | grep -q "^Would install"; then
+        _bb_install_card \
+            "Python dependencies" \
+            "~80 MB" \
+            "fastapi, sqlmodel, taskiq, psutil, bcrypt, pyjwt, …"
+        if ! _bb_confirm "install / update them?"; then
+            echo "  declined — daemon may not start without these" >&2
+            return 1
+        fi
+    fi
     .venv/bin/python -m pip install -q --upgrade pip
     .venv/bin/python -m pip install -q -r requirements.txt
 }
 
 
+# ── Node.js bootstrap ─────────────────────────────────────────────────
+
+
 # Ensure Node.js >= 18 is available for the web client build.
-#
-# Returns 0 on success, 1 if Node is unavailable AND we couldn't auto-install
-# (no sudo, unknown distro). The caller decides whether to abort or continue
-# with a warning — by default we don't block the wizard, since the daemon
-# runs fine without the client (the / route just shows a placeholder).
+# Returns 0 on success / 1 if unavailable and not auto-installable.
 ensure_node() {
     if command -v node >/dev/null 2>&1; then
         local ver
@@ -96,9 +197,7 @@ ensure_node() {
     fi
 
     # Build a prefix that's either empty (we're already root) or
-    # `sudo -E` (preserve env for NodeSource setup script). Either way
-    # `$RUN bash -` expands cleanly — empty prefix just disappears,
-    # extra whitespace is fine.
+    # `sudo -E` (preserve env for NodeSource setup script).
     local RUN=""
     if [ "$(id -u)" -ne 0 ]; then
         if command -v sudo >/dev/null 2>&1; then
@@ -125,19 +224,23 @@ EOF
         fi
     fi
 
-    echo "  Node.js missing — installing..."
+    _bb_install_card \
+        "Node.js 20 LTS" \
+        "~50 MB system-wide" \
+        "from NodeSource (apt/dnf) or distro repo — needed to build the web client"
+    if ! _bb_confirm "install now?"; then
+        echo "  declined — client build will be skipped, the daemon still starts (placeholder UI)" >&2
+        return 1
+    fi
+    echo "  installing..."
 
-    # Each branch streams stderr/stdout straight to the user — install is
-    # one-shot and the operator wants to see what's happening (and any
-    # error if it fails).
+    # Each branch streams stderr/stdout straight to the user.
     if command -v apt-get >/dev/null 2>&1; then
         if ! command -v curl >/dev/null 2>&1; then
             echo "  installing curl + ca-certificates..."
             $RUN apt-get update -qq || true
             $RUN apt-get install -y -qq curl ca-certificates || true
         fi
-        # Try NodeSource first (LTS 20.x); on failure fall back to the
-        # distro's nodejs package (older but reliable).
         if curl -fsSL https://deb.nodesource.com/setup_20.x | $RUN bash -; then
             if $RUN apt-get install -y nodejs; then
                 echo "  ✓ installed node $(node --version 2>/dev/null)"

@@ -1092,7 +1092,11 @@ def build_client_bundle(web_cfg: dict | None) -> None:
     """If web is enabled, install client deps and build the static bundle so
     FastAPI can serve `/blackbox/*` immediately. Skips silently when Node is
     missing or `client/` doesn't exist — falls through with a friendly note,
-    we don't want to abort the whole wizard for a Node toolchain issue."""
+    we don't want to abort the whole wizard for a Node toolchain issue.
+
+    Asks the operator before kicking the npm install — those modules are
+    fat (~250 MB to client/node_modules) so it's worth confirming
+    explicitly. BLACKBOX_YES=1 skips the prompt for CI."""
     if not web_cfg or not web_cfg.get("enabled"):
         return
 
@@ -1106,6 +1110,25 @@ def build_client_bundle(web_cfg: dict | None) -> None:
         warn_line(t("client_pkg_missing"))
         return
 
+    needs_install = not (client_dir / "node_modules").exists()
+    if needs_install and not _confirm_install(
+        title="Web client dependencies",
+        size="~250 MB",
+        detail=f"runs `{Path(pkg).name} install` in client/ — Next.js, react, recharts, xterm, …",
+        prompt="install now?",
+    ):
+        warn_line("declined — skipping client build (FastAPI will show placeholder UI)")
+        return
+
+    if not _confirm_install(
+        title="Build static client bundle",
+        size="~5 MB output to client/out",
+        detail=f"runs `{Path(pkg).name} run build` (Next.js static export)",
+        prompt="build now?",
+    ):
+        warn_line("declined — skipping client build")
+        return
+
     def _install():
         subprocess.run([pkg, "install"], cwd=client_dir, check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
@@ -1115,10 +1138,23 @@ def build_client_bundle(web_cfg: dict | None) -> None:
                        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
 
     try:
-        step(t("step_client_install"), _install, delay=0.0)
+        if needs_install:
+            step(t("step_client_install"), _install, delay=0.0)
         step(t("step_client_build"), _build, delay=0.0)
     except subprocess.CalledProcessError:
         warn_line(t("client_build_failed"))
+
+
+def _confirm_install(*, title: str, size: str, detail: str, prompt: str) -> bool:
+    """Pretty pre-install prompt with a disk-size estimate. Default Yes
+    via Confirm.ask so Enter alone proceeds. BLACKBOX_YES=1 short-circuits."""
+    if os.environ.get("BLACKBOX_YES") == "1":
+        console.print(f"  [cyan]{title}[/cyan]   [dim]{size} · auto-yes (BLACKBOX_YES=1)[/dim]")
+        return True
+    console.print()
+    console.print(f"  [cyan]{title}[/cyan]   [dim]{size}[/dim]")
+    console.print(f"  [dim]{detail}[/dim]")
+    return Confirm.ask(f"  {prompt}", default=True)
 
 
 def restart_service_if_installed() -> None:
