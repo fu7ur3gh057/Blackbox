@@ -89,8 +89,11 @@ async def unlock(req: UnlockRequest, claims: dict = Depends(require_auth)) -> Un
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
 
     ttl = int(cfg.get("token_ttl") or 1800)
+    # `kind` rather than `aud` — PyJWT validates `aud` automatically and
+    # rejects with InvalidAudienceError if `audience=` isn't passed at
+    # decode time. We want a simple custom claim we check ourselves.
     token = encode_token(
-        {"sub": req.username, "aud": "terminal", "via": web_user, "uid": pw.pw_uid},
+        {"sub": req.username, "kind": "terminal", "via": web_user, "uid": pw.pw_uid},
         secret,
         ttl,
     )

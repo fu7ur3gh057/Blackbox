@@ -143,8 +143,8 @@ class TerminalNamespace(AsyncNamespace):
         except InvalidTokenError as e:
             log.info("terminal: refusing %s — bad terminal token: %s", sid, e)
             return False
-        if term_claims.get("aud") != "terminal":
-            log.info("terminal: refusing %s — token wrong audience", sid)
+        if term_claims.get("kind") != "terminal":
+            log.info("terminal: refusing %s — token wrong kind", sid)
             return False
 
         # The terminal token's `sub` is the unix user we'll fork as.
