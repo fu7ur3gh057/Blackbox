@@ -6,7 +6,9 @@ export const Panel = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("panel", className)} {...props} />
+  // h-full so panels in the same grid row stretch to match the tallest
+  // sibling — gives clean 1-1 / 1-1-1 alignment without per-widget tweaks.
+  <div ref={ref} className={cn("panel h-full", className)} {...props} />
 ));
 Panel.displayName = "Panel";
 
@@ -18,12 +20,22 @@ export function PanelBody({ className, ...rest }: React.HTMLAttributes<HTMLDivEl
   return <div className={cn("relative px-5 pb-5", className)} {...rest} />;
 }
 
-export function PanelTitle({ className, ...rest }: React.HTMLAttributes<HTMLHeadingElement>) {
+export function PanelTitle({
+  className,
+  children,
+  ...rest
+}: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn("text-[14px] font-semibold tracking-tight text-ink-strong", className)}
+      className={cn(
+        "text-[14px] font-semibold tracking-tight text-ink-strong inline-flex items-center gap-2",
+        className,
+      )}
       {...rest}
-    />
+    >
+      <span aria-hidden className="text-accent-pale font-mono opacity-70">&gt;</span>
+      {children}
+    </h3>
   );
 }
 

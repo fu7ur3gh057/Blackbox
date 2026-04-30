@@ -55,6 +55,7 @@ body::after {
 ::-webkit-scrollbar-thumb:hover { background: rgba(214,242,107, 0.22); }
 
 @layer components {
+  /* Panel — primary card on dark. */
   .panel {
     @apply relative rounded-card border border-white/[0.05];
     background: linear-gradient(180deg, rgba(214,242,107,0.025) 0%, rgba(214,242,107,0.005) 30%, transparent 100%), #0A0E0B;
@@ -115,6 +116,7 @@ body::after {
 }
 .reveal {
   opacity: 0;
+  height: 100%;            /* fills its grid cell so children can stretch */
   animation: reveal-in 1.0s ease-out forwards;
 }
 

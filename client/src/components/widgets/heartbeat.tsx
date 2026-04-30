@@ -50,7 +50,7 @@ export function Heartbeat() {
   const path = repeatCycle(cycle, 200, 4);
 
   return (
-    <Panel className="overflow-hidden">
+    <Panel className="overflow-hidden flex flex-col">
       <PanelHeader className="pb-1">
         <div className="flex items-center justify-between">
           <PanelTitle className="text-[13px] flex items-center gap-2">
@@ -61,8 +61,8 @@ export function Heartbeat() {
           </span>
         </div>
       </PanelHeader>
-      <PanelBody className="pt-2 pb-3">
-        <div className="relative h-[140px] overflow-hidden rounded-xl bg-black/40 border border-white/[0.04]">
+      <PanelBody className="pt-2 pb-3 flex-1 flex flex-col">
+        <div className="relative flex-1 min-h-[140px] overflow-hidden rounded-xl bg-black/40 border border-white/[0.04]">
           {/* horizontal grid lines */}
           <div className="absolute inset-0 pointer-events-none">
             {[20, 40, 60, 80].map((y) => (

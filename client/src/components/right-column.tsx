@@ -3,6 +3,7 @@
 import { api } from "@/lib/api";
 import { connectNamespace } from "@/lib/socket";
 import type { AlertEvent, CheckSummary, Level, NotifierInfo, SystemSnapshot } from "@/lib/types";
+import { useWsStatus } from "@/lib/use-ws-status";
 import { cn, relativeTime } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -54,25 +55,8 @@ function StatusStrip() {
   );
 }
 
-type WsState = "connecting" | "online" | "offline";
-function useWsStatus(): WsState {
-  const [state, setState] = useState<WsState>("connecting");
-  useEffect(() => {
-    const sock = connectNamespace("/alerts");
-    const ok = () => setState("online");
-    const off = () => setState("offline");
-    sock.on("connect", ok);
-    sock.on("disconnect", off);
-    sock.on("connect_error", off);
-    return () => {
-      sock.off("connect", ok);
-      sock.off("disconnect", off);
-      sock.off("connect_error", off);
-      sock.disconnect();
-    };
-  }, []);
-  return state;
-}
+// shared hook in lib/use-ws-status.ts — both the topbar and this column
+// read from the same source so the indicators never disagree.
 
 function ConnectionPill() {
   const status = useWsStatus();
