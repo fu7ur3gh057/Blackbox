@@ -1,10 +1,10 @@
 import asyncio
 import logging
 
-from .checks import Result, build_check
+from monitoring.checks import Result, build_check
 from .config import Config
-from .notifiers import Alert
-from .notifiers.base import Notifier
+from monitoring.notifiers import Alert
+from monitoring.notifiers import Notifier
 from .state import StateTracker
 
 log = logging.getLogger(__name__)

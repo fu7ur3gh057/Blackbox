@@ -4,9 +4,9 @@ import signal
 import sys
 from pathlib import Path
 
-from .config import Config, load_config
-from .notifiers import build_notifier
-from .runner import Runner
+from monitoring.config import Config, load_config
+from monitoring.notifiers import build_notifier
+from monitoring.runner import Runner
 
 
 def main() -> None:
@@ -37,7 +37,7 @@ async def _run(config: Config) -> None:
         coros.append(Runner(config, all_notifiers).run())
 
     if config.report:
-        from .report import build_report_runner
+        from monitoring.report import build_report_runner
 
         logs_path = ((config.logs or {}).get("storage") or {}).get("path")
         report_runner = build_report_runner(
@@ -47,7 +47,7 @@ async def _run(config: Config) -> None:
             coros.append(report_runner.run())
 
     if config.logs:
-        from .logs import build_log_processor
+        from monitoring.logs import build_log_processor
 
         log_processor = build_log_processor(config.logs, notifiers_by_type)
         if log_processor is not None:

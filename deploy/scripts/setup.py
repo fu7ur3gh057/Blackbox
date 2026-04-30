@@ -810,7 +810,8 @@ def run_dev() -> int:
     venv_py = ensure_venv()
     console.print(f"\n[bold green]→[/bold green] [bold]{t('starting_dev')}[/bold]\n")
     os.chdir(PROJECT_ROOT)
-    return subprocess.call([str(venv_py), "-m", "src.main", str(CONFIG_FILE)])
+    env = {**os.environ, "PYTHONPATH": str(PROJECT_ROOT / "src")}
+    return subprocess.call([str(venv_py), "-m", "main", str(CONFIG_FILE)], env=env)
 
 
 # ── systemd ─────────────────────────────────────────────────────────────────
@@ -922,7 +923,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory={PROJECT_ROOT}
-ExecStart={venv_py} -m src.main {CONFIG_FILE}
+Environment=PYTHONPATH={PROJECT_ROOT}/src
+ExecStart={venv_py} -m main {CONFIG_FILE}
 Restart=on-failure
 RestartSec=5s
 
