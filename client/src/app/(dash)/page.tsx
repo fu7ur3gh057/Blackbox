@@ -19,7 +19,7 @@ import { WatchCards } from "@/components/widgets/watch-cards";
  */
 export default function Dashboard() {
   return (
-    <div className="space-y-5 max-w-[1400px]">
+    <div className="space-y-5">
       <div className="grid grid-cols-12 gap-5">
         <div className="col-span-12 lg:col-span-8 xl:col-span-9">
           <Reveal delay={0}><Statistics /></Reveal>
