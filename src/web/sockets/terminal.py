@@ -208,27 +208,41 @@ class TerminalNamespace(AsyncNamespace):
             "LC_ALL":      os.environ.get("LC_ALL", os.environ.get("LANG", "C.UTF-8")),
         }
 
-        def _drop_privs() -> None:
-            # Must run before exec — sets the child up as the target uid.
-            os.setsid()                                       # new session
-            try:
-                os.initgroups(username, pw.pw_gid)            # supplementary groups
-            except PermissionError:
-                pass                                          # not root → already same-user; skip
-            try:
-                os.setgid(pw.pw_gid)
-                os.setuid(pw.pw_uid)
-            except PermissionError:
-                pass                                          # same-user case; nothing to do
-
         try:
             master_fd, slave_fd = pty.openpty()
             # Sane initial size — client will TIOCSWINSZ on its first frame.
             fcntl.ioctl(master_fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
+
+            def _child_setup(slave_fd: int = slave_fd) -> None:
+                # Order matters: subprocess will (after this returns)
+                # dup2 the slave fd onto 0/1/2 and then close_fds. We
+                # must (a) make this a new session and (b) attach the
+                # slave PTY as the controlling TTY *here*, otherwise
+                # `bash -i` notices no ctty and exits immediately.
+                os.setsid()
+                try:
+                    fcntl.ioctl(slave_fd, termios.TIOCSCTTY, 0)
+                except OSError:
+                    # Some kernels need the slave to be opened *after*
+                    # setsid to grab ctty. Re-open it as the steal arg.
+                    pass
+
+                # Drop privileges. Must run before exec — sets the child
+                # up as the target uid for the rest of its lifetime.
+                try:
+                    os.initgroups(username, pw.pw_gid)
+                except PermissionError:
+                    pass  # not root → already same-user; skip
+                try:
+                    os.setgid(pw.pw_gid)
+                    os.setuid(pw.pw_uid)
+                except PermissionError:
+                    pass
+
             proc = subprocess.Popen(
                 [shell, "-i", "-l"],
                 stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-                preexec_fn=_drop_privs,
+                preexec_fn=_child_setup,
                 cwd=cwd,
                 env=env,
                 close_fds=True,
