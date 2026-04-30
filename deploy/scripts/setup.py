@@ -113,6 +113,9 @@ LOCALES: dict[str, dict[str, str]] = {
         "logs_hint_perm": "[dim]not readable for {user} — daemon must run as root or fix perms[/dim]",
         "section_web": "Web client (FastAPI)",
         "ask_web_yn": "expose the web client (Swagger + admin API)?",
+        "ask_terminal_yn": "enable in-browser TERMINAL? (gives a root shell to anyone with the admin password — opt-in)",
+        "ask_terminal_shell": "  shell",
+        "terminal_warn": "[yellow]![/yellow] every keystroke is logged to terminal_audit table — including passwords typed at prompts",
         "ask_web_port": "  port",
         "ask_web_username": "  admin username",
         "ask_web_password": "  admin password (8+ chars)",
@@ -236,6 +239,9 @@ LOCALES: dict[str, dict[str, str]] = {
         "logs_hint_perm": "[dim]не читается для {user} — демон должен быть от root или поправь права[/dim]",
         "section_web": "Веб-клиент (FastAPI)",
         "ask_web_yn": "поднимать веб-клиент (Swagger + admin API)?",
+        "ask_terminal_yn": "включить ТЕРМИНАЛ в браузере? (даёт root shell любому с паролем админа — opt-in)",
+        "ask_terminal_shell": "  shell",
+        "terminal_warn": "[yellow]![/yellow] каждое нажатие пишется в таблицу terminal_audit — включая пароли набранные на запросах",
         "ask_web_port": "  порт",
         "ask_web_username": "  логин админа",
         "ask_web_password": "  пароль админа (8+ символов)",
@@ -978,12 +984,31 @@ def configure_web() -> dict | None:
 
     user_block, jwt_block = _gather_web_user()
     console.print(f"  [dim italic]{t('web_url_hint', port=port)}[/dim italic]")
-    return {
+
+    # Optional in-browser terminal — opt-in, default off. Anyone with the
+    # admin password gets a root shell, so the wizard surfaces the
+    # trade-off explicitly.
+    terminal_block: dict | None = None
+    console.print(f"  {t('terminal_warn')}")
+    if Confirm.ask(f"  {t('ask_terminal_yn')}", default=False):
+        shell = Prompt.ask(t("ask_terminal_shell"), default="/bin/bash") or "/bin/bash"
+        terminal_block = {
+            "enabled": True,
+            "shell": shell,
+            "cwd": "/",
+            "audit": True,
+            "max_sessions": 1,
+        }
+
+    out: dict = {
         "enabled": True,
         "port": port,
         "user": user_block,
         "jwt": jwt_block,
     }
+    if terminal_block:
+        out["terminal"] = terminal_block
+    return out
 
 
 def _gather_web_user() -> tuple[dict, dict]:
@@ -1429,6 +1454,19 @@ web:
   jwt:
     secret: "{secret}"
     expiry_seconds: {expiry}
+""")
+        term = web_cfg.get("terminal") or {}
+        if term.get("enabled"):
+            shell = term.get("shell", "/bin/bash")
+            cwd = term.get("cwd", "/")
+            max_sessions = int(term.get("max_sessions", 1))
+            parts.append(f"""\
+  terminal:
+    enabled: true
+    shell: {shell}
+    cwd: {cwd}
+    audit: true
+    max_sessions: {max_sessions}
 """)
     return "".join(parts)
 

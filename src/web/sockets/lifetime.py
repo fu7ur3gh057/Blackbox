@@ -26,6 +26,7 @@ from web.sockets.namespaces import (
     LogsNamespace,
     SystemNamespace,
 )
+from web.sockets.terminal import TerminalNamespace
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +54,16 @@ def init_socketio(
     server.register_namespace(LogsNamespace("/logs"))
     server.register_namespace(SystemNamespace("/system"))
 
+    # /terminal is opt-in: gives root shell to anyone with a valid JWT,
+    # so we only mount it when web.terminal.enabled is true. Default
+    # config keeps it off; the wizard asks before turning it on.
+    ctx = broker.state.data.get("app_ctx")
+    cfg = ctx.config if ctx is not None else None
+    terminal_cfg = ((getattr(cfg, "web", None) or {}).get("terminal") or {})
+    if terminal_cfg.get("enabled"):
+        server.register_namespace(TerminalNamespace("/terminal"))
+        log.info("terminal: enabled, namespace /terminal mounted")
+
     mount_path = f"{prefix}/ws" if prefix else "/ws"
     # ASGIApp checks `scope.path.startswith(f"/{socketio_path}/")` — so we
     # bake the full URL prefix in here.
@@ -61,9 +72,13 @@ def init_socketio(
     app.mount(mount_path, sio_app)
 
     broker.state.sio_server = server
+    ns_list = "/alerts /checks /docker /logs /system" + (
+        " /terminal" if terminal_cfg.get("enabled") else ""
+    )
     log.info(
-        "socket.io mounted at /%s — namespaces: /alerts /checks /docker /logs /system",
+        "socket.io mounted at /%s — namespaces: %s",
         sio_path,
+        ns_list,
     )
     return server
 

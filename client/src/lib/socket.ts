@@ -17,7 +17,7 @@ import { io, Socket } from "socket.io-client";
 
 const SOCKET_PATH = "/blackbox/ws/socket.io";
 
-export type Namespace = "/alerts" | "/checks" | "/docker" | "/logs" | "/system";
+export type Namespace = "/alerts" | "/checks" | "/docker" | "/logs" | "/system" | "/terminal";
 
 interface SharedEntry {
   sock: Socket;

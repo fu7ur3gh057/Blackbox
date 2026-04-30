@@ -8,18 +8,20 @@ import {
   Activity,
   Bell,
   Boxes,
-  Terminal,
   Settings,
+  SquareTerminal,
+  Terminal,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV: { href: string; Icon: LucideIcon; label: string }[] = [
-  { href: "/",        Icon: LayoutDashboard, label: "Overview" },
-  { href: "/checks",  Icon: Activity,        label: "Checks" },
-  { href: "/alerts",  Icon: Bell,            label: "Alerts" },
-  { href: "/docker",  Icon: Boxes,           label: "Docker" },
-  { href: "/logs",    Icon: Terminal,        label: "Logs" },
+  { href: "/",         Icon: LayoutDashboard, label: "Overview" },
+  { href: "/checks",   Icon: Activity,        label: "Checks" },
+  { href: "/alerts",   Icon: Bell,            label: "Alerts" },
+  { href: "/docker",   Icon: Boxes,           label: "Docker" },
+  { href: "/logs",     Icon: Terminal,        label: "Logs" },
+  { href: "/terminal", Icon: SquareTerminal,  label: "Terminal" },
 ];
 
 export function LeftRail() {

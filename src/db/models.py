@@ -15,6 +15,10 @@ keep on disk indefinitely with a periodic cleanup.
 - LogEvent: append-only log of every matched line LogProcessor records.
   Pruned periodically per `retention_days` / `max_rows` so the table stays
   bounded — replaces the legacy JSONL file storage.
+- TerminalAuditEntry: audit log for the in-browser web terminal.
+  EVERY keystroke chunk is recorded — including whatever was typed, even
+  passwords and tokens. Treat the table as sensitive: same access level
+  as the JWT secret and DB itself.
 """
 
 from sqlalchemy import JSON, Column
@@ -72,3 +76,22 @@ class LogEvent(SQLModel, table=True):
     sig: str = Field(index=True)
     first: bool = False
     line: str
+
+
+class TerminalAuditEntry(SQLModel, table=True):
+    """Append-only audit log for `/terminal` WS sessions.
+
+    Records session lifecycle events (open/close/kill) and every input
+    chunk the user sends through the PTY. The data column holds the raw
+    bytes decoded as UTF-8 (replace errors), so passwords typed at a
+    prompt end up here verbatim — guard the DB accordingly.
+    """
+
+    __tablename__ = "terminal_audit"
+
+    id: int | None = Field(default=None, primary_key=True)
+    ts: float = Field(index=True)
+    sid: str = Field(index=True)
+    username: str = Field(index=True)
+    kind: str  # "open" | "input" | "close" | "kill" | "denied"
+    data: str | None = None

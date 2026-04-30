@@ -109,3 +109,14 @@ web:
   host: 0.0.0.0                # listen on all interfaces (LAN + WAN)
   port: 8765
   prefix: /blackbox            # URL prefix; "" disables prefixing
+
+  # In-browser terminal — opt-in. Anyone with the admin password gets a
+  # root shell, so default is OFF. Every keystroke is logged to the
+  # `terminal_audit` SQLite table (passwords typed at prompts will end up
+  # there). Single session per user enforced server-side.
+  # terminal:
+  #   enabled: true
+  #   shell: /bin/bash
+  #   cwd: /
+  #   audit: true
+  #   max_sessions: 1

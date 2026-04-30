@@ -17,6 +17,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  SquareTerminal,
   Terminal,
   Zap,
   type LucideIcon,
@@ -353,10 +354,21 @@ function QuickActions() {
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-4 gap-2">
       <Action Icon={Zap}       label="run"     onClick={runAll}    active={busy === "run"} />
       <Action Icon={Send}      label="test"    onClick={testAlert} active={busy === "test"} />
       <Action Icon={RefreshCw} label="refresh" onClick={refresh}   active={busy === "refresh"} spin={busy === "refresh"} />
+      <Link
+        href="/terminal"
+        title="Open web terminal — opt-in via config.web.terminal.enabled"
+        className={cn(
+          "h-10 rounded-xl flex items-center justify-center gap-2 border transition",
+          "bg-white/[0.025] text-ink-dim border-white/[0.05] hover:text-accent-pale hover:border-accent-pale/30",
+        )}
+      >
+        <SquareTerminal size={14} strokeWidth={1.8} />
+        <span className="text-[11px] uppercase tracking-wider font-mono">term</span>
+      </Link>
     </div>
   );
 }
