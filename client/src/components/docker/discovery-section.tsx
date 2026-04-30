@@ -99,6 +99,7 @@ function DiscoveredRow({ project }: { project: DiscoveredProject }) {
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const qc = useQueryClient();
 
@@ -106,15 +107,24 @@ function DiscoveredRow({ project }: { project: DiscoveredProject }) {
     setAdding(true);
     setError(null);
     setWarning(null);
+    setInfo(null);
     try {
-      const res = await api.post<{ ok: boolean; warning: string | null }>(
+      const res = await api.post<{
+        ok: boolean;
+        warning: string | null;
+        log_sources_added?: string[];
+      }>(
         "/docker/monitor",
         { compose: project.compose, services: project.services },
       );
       if (res.warning) setWarning(res.warning);
-      // Refresh both lists in parallel so the project drops off Discovery
-      // and shows up in the main grid in the same render frame — no need
-      // to wait for the next WS tick.
+      if (res.log_sources_added && res.log_sources_added.length > 0) {
+        setInfo(
+          `+ log capture for ${res.log_sources_added.length} service${
+            res.log_sources_added.length === 1 ? "" : "s"
+          } — flowing into /logs now`,
+        );
+      }
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["docker-discovered"] }),
         refreshDockerSnapshot(qc),
@@ -192,6 +202,12 @@ function DiscoveredRow({ project }: { project: DiscoveredProject }) {
           {adding ? "adding…" : "add"}
         </button>
       </div>
+      {info && (
+        <div className="px-4 py-2 border-t border-accent-pale/25 bg-accent-pale/[0.05] text-[10.5px] font-mono text-accent-pale flex items-start gap-2">
+          <Check size={11} className="mt-0.5 shrink-0" />
+          {info}
+        </div>
+      )}
       {warning && (
         <div className="px-4 py-2 border-t border-level-warn/30 bg-level-warn/[0.06] text-[10.5px] font-mono text-level-warn flex items-start gap-2">
           <AlertCircle size={11} className="mt-0.5 shrink-0" />

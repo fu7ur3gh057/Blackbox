@@ -74,6 +74,10 @@ async def _run(config: Config, *, web_enabled: bool) -> None:
             store=broker.state.data.get("log_store"),
         )
         if log_processor is not None:
+            # Pin to broker.state so /api/docker/monitor (and any other
+            # endpoint that wants to hot-plug a source) can reach it
+            # without a global import cycle.
+            broker.state.log_processor = log_processor
             coros.append(log_processor.run())
 
     if web_enabled:

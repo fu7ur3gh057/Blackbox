@@ -60,6 +60,11 @@ class LogProcessor:
     async def run(self) -> None:
         if not self.sources:
             log.warning("logs: no sources configured")
+            # Even without sources we want the digest loop alive so a
+            # later `add_source()` call from /api/docker/monitor can hot-
+            # plug a consumer without restarting the daemon.
+            self._consumer_tasks: list[asyncio.Task] = []
+            await self._digest_loop()
             return
         await self._hydrate_from_db()
         log.info(
@@ -67,9 +72,35 @@ class LogProcessor:
             len(self.sources), self.digest_interval,
             self.store.retention_days, self.store.max_rows, len(self._sigs),
         )
-        tasks = [self._consume(s) for s in self.sources]
-        tasks.append(self._digest_loop())
-        await asyncio.gather(*tasks)
+        self._consumer_tasks = [
+            asyncio.create_task(self._consume(s), name=f"log-consume-{s.name}")
+            for s in self.sources
+        ]
+        self._consumer_tasks.append(
+            asyncio.create_task(self._digest_loop(), name="log-digest")
+        )
+        await asyncio.gather(*self._consumer_tasks, return_exceptions=True)
+
+    def add_source(self, source: LogSource) -> bool:
+        """Hot-plug a new source while the processor is running. Returns
+        True if a new consumer was spawned, False if a source with the
+        same `.name` already exists. Used by /api/docker/monitor so log
+        capture starts without a daemon restart."""
+        if any(s.name == source.name for s in self.sources):
+            return False
+        self.sources.append(source)
+        try:
+            task = asyncio.create_task(
+                self._consume(source), name=f"log-consume-{source.name}"
+            )
+            if hasattr(self, "_consumer_tasks"):
+                self._consumer_tasks.append(task)
+            log.info("logs: hot-added source %s", source.name)
+            return True
+        except RuntimeError:
+            # Not in an event loop (e.g. called too early) — caller falls
+            # back to advising a daemon restart.
+            return False
 
     async def _hydrate_from_db(self) -> None:
         from db.models import LogSignatureEntry

@@ -318,6 +318,44 @@ async def monitor(payload: dict) -> dict:
     if not already:
         docker_list.append(entry)
 
+    # Auto-wire docker log capture for each service if the user already
+    # has a `logs:` block — one source per service. Pattern is broad
+    # enough to catch the usual error/warn/fatal/exception/traceback
+    # vocabulary; the user can tighten it later in config.yaml.
+    log_sources_added: list[str] = []
+    logs_cfg = ctx.config.logs
+    if isinstance(logs_cfg, dict) and isinstance(logs_cfg.get("sources"), list) and services:
+        log_sources = logs_cfg["sources"]
+        from core.logs.sources.docker import DockerLogSource
+        processor = broker.state.data.get("log_processor")
+        for svc in services:
+            sname = f"docker-{svc}"
+            if any(s.get("name") == sname for s in log_sources):
+                continue
+            entry_log = {
+                "type": "docker",
+                "name": sname,
+                "compose": compose,
+                "service": svc,
+                "pattern": r"(?i)error|warn|fatal|fail|exception|critical|traceback",
+                "poll_interval": 30,
+            }
+            log_sources.append(entry_log)
+            log_sources_added.append(sname)
+            # Hot-plug into the running processor so logs flow without a
+            # daemon restart. If the processor isn't up yet (no logs in
+            # config at boot), we still wrote the source — restart picks
+            # it up.
+            if processor is not None:
+                try:
+                    processor.add_source(DockerLogSource(
+                        name=sname, compose=compose, service=svc,
+                        pattern=entry_log["pattern"],
+                        poll_interval=float(entry_log["poll_interval"]),
+                    ))
+                except Exception:
+                    log.exception("docker.monitor: hot-plug log source failed for %s", sname)
+
     # Persist to config.yaml.
     config_path = broker.state.data.get("config_path")
     warning: str | None = None
@@ -332,6 +370,22 @@ async def monitor(payload: dict) -> dict:
             raw.setdefault("report", {}).setdefault("docker", [])
             if not any((p.get("compose") == compose) for p in raw["report"]["docker"]):
                 raw["report"]["docker"].append(entry)
+            # Mirror the in-memory log-source additions to disk.
+            if log_sources_added:
+                logs_block = raw.setdefault("logs", {})
+                file_log_sources = logs_block.setdefault("sources", [])
+                for sname in log_sources_added:
+                    if any(s.get("name") == sname for s in file_log_sources):
+                        continue
+                    svc = sname.removeprefix("docker-")
+                    file_log_sources.append({
+                        "type": "docker",
+                        "name": sname,
+                        "compose": compose,
+                        "service": svc,
+                        "pattern": r"(?i)error|warn|fatal|fail|exception|critical|traceback",
+                        "poll_interval": 30,
+                    })
             new_text = _yaml.safe_dump(raw, sort_keys=False, allow_unicode=True)
             if _has_comments(existing_text):
                 warning = "config.yaml had comments — they are NOT preserved by this write."
@@ -350,6 +404,7 @@ async def monitor(payload: dict) -> dict:
         "ok": True,
         "compose": compose,
         "already_monitored": already,
+        "log_sources_added": log_sources_added,
         "warning": warning,
     }
 
