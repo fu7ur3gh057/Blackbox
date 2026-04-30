@@ -1,8 +1,6 @@
 "use client";
 
 import { auth } from "@/lib/auth";
-import { useWsStatus } from "@/lib/use-ws-status";
-import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, ChevronDown, LogOut, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -27,11 +25,7 @@ export function TopHeader() {
         <span className="text-accent-pale text-base">$</span>
         <span className="text-lg tracking-tight text-ink-strong">blackbox</span>
         <span className="text-accent-pale cursor-blink text-base">_</span>
-        <span className="ml-3 text-[11px] text-ink-mute uppercase tracking-[0.2em]">monitoring</span>
       </div>
-
-      {/* WS connection indicator — same source as the right column's pill */}
-      <NavConnectionPill />
 
       {/* right cluster */}
       <div className="flex items-center gap-2.5">
@@ -63,19 +57,3 @@ export function TopHeader() {
   );
 }
 
-function NavConnectionPill() {
-  const status = useWsStatus();
-  const cfg = {
-    online:     { dot: "bg-accent-green", pulse: "pulse-green", label: "live" },
-    offline:    { dot: "bg-level-crit",   pulse: "pulse-crit",  label: "offline" },
-    connecting: { dot: "bg-level-warn",   pulse: "",            label: "syncing" },
-  }[status];
-  return (
-    <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.06]">
-      <span className={cn("h-1.5 w-1.5 rounded-full", cfg.dot, cfg.pulse)} />
-      <span className="text-[11px] uppercase tracking-[0.16em] font-mono text-ink-strong">
-        {cfg.label}
-      </span>
-    </div>
-  );
-}

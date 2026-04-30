@@ -9,35 +9,39 @@ import { Statistics } from "@/components/widgets/statistics";
 import { WatchCards } from "@/components/widgets/watch-cards";
 
 /**
- * Single-column dashboard now that the right sidebar (recent alerts +
- * status cluster + quick actions) lives in the fixed RightColumn.
+ * Smart layout — short and tall widgets pair up so the eye doesn't see
+ * a 1:1 row where one card is twice the height of its neighbour. Tall
+ * lefts lean against stacked rights:
  *
- *   1. Statistics (full width)
- *   2. Healthy + Network (NodeWeb) — 2-up under stats
- *   3. Gauge / Pixel / Heartbeat — 3-up
- *   4. Watch cards
- *   5. Server location
- *
- * Each step staggered with <Reveal /> for a deliberate fade-in.
+ *   1. Statistics                                    (full width)
+ *   2. HealthyList (tall)  ║  NodeWeb / Heartbeat   (stacked, 1+1)
+ *   3. GaugeMeter           ║  PixelGrid             (similar heights)
+ *   4. WatchCards                                    (full width)
+ *   5. ServerLocation                                (full width)
  */
 export default function Dashboard() {
   return (
     <div className="space-y-5">
       <Reveal delay={0}><Statistics /></Reveal>
 
+      {/* Tall list on the left, two stacked widgets on the right.
+          The right column uses grid-rows-2 so NodeWeb + Heartbeat
+          split the available height (= HealthyList's height) evenly. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Reveal delay={250}><HealthyList /></Reveal>
-        <Reveal delay={500}><NodeWeb /></Reveal>
+        <div className="grid grid-rows-[1fr_1fr] gap-5 min-h-0">
+          <Reveal delay={400}><NodeWeb /></Reveal>
+          <Reveal delay={550}><Heartbeat /></Reveal>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <Reveal delay={800}><GaugeMeter /></Reveal>
         <Reveal delay={1000}><PixelGrid /></Reveal>
-        <Reveal delay={1200}><Heartbeat /></Reveal>
       </div>
 
-      <Reveal delay={1500}><WatchCards /></Reveal>
-      <Reveal delay={1800}><ServerLocation /></Reveal>
+      <Reveal delay={1300}><WatchCards /></Reveal>
+      <Reveal delay={1600}><ServerLocation /></Reveal>
     </div>
   );
 }
