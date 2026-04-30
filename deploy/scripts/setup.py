@@ -89,6 +89,16 @@ LOCALES: dict[str, dict[str, str]] = {
         "step_detect_systemd": "detecting running services",
         "systemd_pick": "Which services to alert on if they go down?",
         "systemd_none": "no user services detected",
+        "section_web": "Web client (FastAPI)",
+        "ask_web_yn": "expose the web client (Swagger + API)?",
+        "ask_web_port": "  port",
+        "web_url_hint": "after start: http://<vps-ip>:{port}/blackbox/api/docs",
+        "web_summary_header": "Web client URLs (paste into browser):",
+        "web_summary_swagger": "  Swagger UI:   {url}",
+        "web_summary_redoc":   "  ReDoc:        {url}",
+        "web_summary_openapi": "  OpenAPI JSON: {url}",
+        "web_summary_health":  "  Healthcheck:  {url}",
+        "web_summary_firewall": "if it doesn't open — open port {port} in your VPS firewall (ufw allow {port}, or your provider's panel)",
         "warn_not_found": "{path} not found, including anyway",
         "step_backup": "backing up to {name}",
         "step_write": "writing config.yaml",
@@ -168,6 +178,16 @@ LOCALES: dict[str, dict[str, str]] = {
         "step_detect_systemd": "ищу запущенные сервисы",
         "systemd_pick": "Какие сервисы алертить при падении?",
         "systemd_none": "пользовательских сервисов не найдено",
+        "section_web": "Веб-клиент (FastAPI)",
+        "ask_web_yn": "поднимать веб-клиент (Swagger + API)?",
+        "ask_web_port": "  порт",
+        "web_url_hint": "после старта: http://<ip-впс>:{port}/blackbox/api/docs",
+        "web_summary_header": "URL'ы веб-клиента (вставь в браузер):",
+        "web_summary_swagger": "  Swagger UI:   {url}",
+        "web_summary_redoc":   "  ReDoc:        {url}",
+        "web_summary_openapi": "  OpenAPI JSON: {url}",
+        "web_summary_health":  "  Healthcheck:  {url}",
+        "web_summary_firewall": "если не открывается — открой порт {port} в фаерволе VPS (ufw allow {port} или в панели хостера)",
         "warn_not_found": "{path} не найден, добавляю всё равно",
         "step_backup": "бэкаплю в {name}",
         "step_write": "пишу config.yaml",
@@ -375,12 +395,16 @@ def run_wizard() -> None:
     if Confirm.ask(f"  {t('ask_systemd_yn')}", default=False):
         systemd_units = configure_systemd()
 
+    section(t("section_web"))
+    web_cfg = configure_web()
+
     yaml_text = build_yaml(
         bot_token=bot_token, chat_id=chat_id, proxy=proxy_url,
         hostname=hostname, report_interval=int(report_int),
         warn_pct=int(warn_pct), crit_pct=int(crit_pct),
         disks=disks, docker_blocks=docker_blocks,
         net_cfg=net_cfg, systemd_units=systemd_units,
+        web_cfg=web_cfg,
         notifier_lang=LANG,
     )
 
@@ -389,6 +413,8 @@ def run_wizard() -> None:
         backup = CONFIG_FILE.with_suffix(".yaml.bak")
         step(t("step_backup", name=backup.name), lambda: shutil.copy(CONFIG_FILE, backup))
     step(t("step_write"), lambda: CONFIG_FILE.write_text(yaml_text))
+
+    print_web_summary(web_cfg)
 
 
 # ── disk detection ─────────────────────────────────────────────────────────
@@ -565,6 +591,62 @@ def configure_systemd() -> list[str]:
     return questionary.checkbox(t("systemd_pick"), choices=choices).ask() or []
 
 
+# ── web client ─────────────────────────────────────────────────────────────
+
+def configure_web() -> dict | None:
+    """Ask whether to expose the web client and on which port. Returns
+    {'enabled': True, 'port': N} or None if the user declines."""
+    if not Confirm.ask(f"  {t('ask_web_yn')}", default=False):
+        return None
+    port_str = Prompt.ask(f"{t('ask_web_port')}", default="8765")
+    try:
+        port = int(port_str)
+    except ValueError:
+        port = 8765
+    console.print(f"  [dim italic]{t('web_url_hint', port=port)}[/dim italic]")
+    return {"enabled": True, "port": port}
+
+
+def detect_public_ip() -> str:
+    """Best-effort: ipify for the egress IP, UDP-trick for the local IP,
+    'localhost' as last resort. Used to print real URLs after the wizard."""
+    import urllib.request
+
+    try:
+        req = urllib.request.Request("https://api.ipify.org", headers={"User-Agent": "blackbox-setup"})
+        with urllib.request.urlopen(req, timeout=3) as r:
+            ip = r.read().decode().strip()
+            if ip:
+                return ip
+    except Exception:
+        pass
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return "localhost"
+    finally:
+        s.close()
+
+
+def print_web_summary(web_cfg: dict | None) -> None:
+    """Final block of the wizard — paste-ready URLs for the user."""
+    if not web_cfg or not web_cfg.get("enabled"):
+        return
+    port = int(web_cfg.get("port", 8765))
+    ip = detect_public_ip()
+    base = f"http://{ip}:{port}/blackbox"
+
+    console.print()
+    console.print(f"[bold green]{t('web_summary_header')}[/bold green]")
+    console.print(t("web_summary_swagger", url=f"[cyan]{base}/api/docs[/cyan]"))
+    console.print(t("web_summary_redoc",   url=f"[cyan]{base}/api/redoc[/cyan]"))
+    console.print(t("web_summary_openapi", url=f"[cyan]{base}/api/openapi.json[/cyan]"))
+    console.print(t("web_summary_health",  url=f"[cyan]{base}/health[/cyan]"))
+    console.print(f"  [dim italic]{t('web_summary_firewall', port=port)}[/dim italic]")
+
+
 # ── docker detection ───────────────────────────────────────────────────────
 
 def detect_compose_projects() -> list[dict]:
@@ -716,6 +798,7 @@ def build_yaml(
     docker_blocks: list[dict],
     net_cfg: dict | bool = True,
     systemd_units: list[str] | None = None,
+    web_cfg: dict | None = None,
     notifier_lang: str = "en",
 ) -> str:
     systemd_units = systemd_units or []
@@ -782,6 +865,16 @@ report:
                 parts.append(f"      containers: [{', '.join(b['containers'])}]\n")
             if b["starred"]:
                 parts.append(f"      starred: [{', '.join(b['starred'])}]\n")
+
+    if web_cfg and web_cfg.get("enabled"):
+        port = int(web_cfg.get("port", 8765))
+        parts.append(f"""
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: {port}
+  prefix: /blackbox
+""")
     return "".join(parts)
 
 
