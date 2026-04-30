@@ -101,6 +101,12 @@ LOCALES: dict[str, dict[str, str]] = {
         "ask_web_keep_user": "found existing admin user '{username}' — keep current password?",
         "web_password_short": "password too short, min 8 chars — try again",
         "web_password_mismatch": "passwords don't match — try again",
+        "step_client_install": "installing client deps (npm)",
+        "step_client_build":   "building client bundle (next build)",
+        "step_restart_service": "restarting blackbox.service",
+        "client_pkg_missing": "node/npm not found — skip client build (install Node 20+ then run `make client-build`)",
+        "client_build_skipped": "client/ folder missing — skip build",
+        "client_build_failed": "client build failed — re-run `make client-build` after fixing the error above",
         "web_url_hint": "after start: http://<vps-ip>:{port}/blackbox/api/docs",
         "web_summary_header": "Web client URLs (paste into browser):",
         "web_summary_swagger": "  Swagger UI:   {url}",
@@ -199,6 +205,12 @@ LOCALES: dict[str, dict[str, str]] = {
         "ask_web_keep_user": "найден админ '{username}' — оставить текущий пароль?",
         "web_password_short": "слишком короткий пароль (минимум 8 символов) — попробуй ещё",
         "web_password_mismatch": "пароли не совпадают — попробуй ещё",
+        "step_client_install": "ставлю зависимости фронта (npm)",
+        "step_client_build":   "собираю фронт (next build)",
+        "step_restart_service": "рестартую blackbox.service",
+        "client_pkg_missing": "node/npm не найден — пропускаю сборку (поставь Node 20+ и запусти `make client-build`)",
+        "client_build_skipped": "папка client/ не найдена — пропускаю сборку",
+        "client_build_failed": "сборка фронта упала — после фикса ошибки выше запусти `make client-build`",
         "web_url_hint": "после старта: http://<ip-впс>:{port}/blackbox/api/docs",
         "web_summary_header": "URL'ы веб-клиента (вставь в браузер):",
         "web_summary_swagger": "  Swagger UI:   {url}",
@@ -449,6 +461,13 @@ def run_wizard() -> None:
         backup = CONFIG_FILE.with_suffix(".yaml.bak")
         step(t("step_backup", name=backup.name), lambda: shutil.copy(CONFIG_FILE, backup))
     step(t("step_write"), lambda: CONFIG_FILE.write_text(yaml_text))
+
+    # If web was enabled, build the bundle and bounce the service in place.
+    # Both are no-ops if the prerequisites aren't met (Node missing, unit
+    # not installed yet) — the user can always finish the steps manually.
+    build_client_bundle(web_cfg)
+    if web_cfg and web_cfg.get("enabled"):
+        restart_service_if_installed()
 
     print_web_summary(web_cfg)
 
@@ -726,6 +745,56 @@ def detect_public_ip() -> str:
         return "localhost"
     finally:
         s.close()
+
+
+def build_client_bundle(web_cfg: dict | None) -> None:
+    """If web is enabled, install client deps and build the static bundle so
+    FastAPI can serve `/blackbox/*` immediately. Skips silently when Node is
+    missing or `client/` doesn't exist — falls through with a friendly note,
+    we don't want to abort the whole wizard for a Node toolchain issue."""
+    if not web_cfg or not web_cfg.get("enabled"):
+        return
+
+    client_dir = PROJECT_ROOT / "client"
+    if not client_dir.exists() or not (client_dir / "package.json").exists():
+        warn_line(t("client_build_skipped"))
+        return
+
+    pkg = shutil.which("pnpm") or shutil.which("npm")
+    if not pkg:
+        warn_line(t("client_pkg_missing"))
+        return
+
+    def _install():
+        subprocess.run([pkg, "install"], cwd=client_dir, check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+    def _build():
+        subprocess.run([pkg, "run", "build"], cwd=client_dir, check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+    try:
+        step(t("step_client_install"), _install, delay=0.0)
+        step(t("step_client_build"), _build, delay=0.0)
+    except subprocess.CalledProcessError:
+        warn_line(t("client_build_failed"))
+
+
+def restart_service_if_installed() -> None:
+    """If the systemd unit is already on disk, kick it so the freshly
+    built client/out/ and the new config.yaml take effect immediately.
+    No-op for first-time installs (the menu's `install service` path
+    handles the initial start)."""
+    if not Path(UNIT_PATH).exists():
+        return
+    def _restart():
+        subprocess.run(["sudo", "systemctl", "restart", SERVICE_NAME],
+                       check=True, stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+    try:
+        step(t("step_restart_service"), _restart, delay=0.0)
+    except subprocess.CalledProcessError:
+        pass  # missing sudo / unit not enabled — let the operator restart manually
 
 
 def print_web_summary(web_cfg: dict | None) -> None:

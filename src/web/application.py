@@ -26,9 +26,10 @@ from web.lifetime import lifespan
 
 log = logging.getLogger(__name__)
 
-# Default to Next.js dev server. In prod (behind SSH tunnel or direct port)
-# CORS is moot — the browser hits the same origin once it's reachable.
-_DEFAULT_CORS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+# Default to Next.js dev server (port 8677 — out of the way of the usual
+# 3000/8080 collisions). In prod the bundle is served by FastAPI itself,
+# so it's same-origin and CORS doesn't gate it.
+_DEFAULT_CORS = ["http://localhost:8677", "http://127.0.0.1:8677"]
 
 DEFAULT_PREFIX = "/blackbox"
 

@@ -1,7 +1,8 @@
 /**
- * Shapes returned by the FastAPI handlers. Keep in sync with
- * src/web/apis/*/schemas.py — when an endpoint grows a field, add it
- * here and the type checker will surface the call sites that need it.
+ * Shapes returned by the FastAPI handlers. Keep in sync with the
+ * `schemas.py` files under `src/web/apis/<domain>` — when an endpoint
+ * grows a field, add it here and the type checker will surface the
+ * call sites that need it.
  */
 
 export interface SystemSnapshot {
