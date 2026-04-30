@@ -95,10 +95,14 @@ ensure_node() {
         echo "  node $(node --version) is too old, need >= 18" >&2
     fi
 
-    local SUDO=""
+    # Build a prefix that's either empty (we're already root) or
+    # `sudo -E` (preserve env for NodeSource setup script). Either way
+    # `$RUN bash -` expands cleanly — empty prefix just disappears,
+    # extra whitespace is fine.
+    local RUN=""
     if [ "$(id -u)" -ne 0 ]; then
         if command -v sudo >/dev/null 2>&1; then
-            SUDO="sudo"
+            RUN="sudo -E"
         else
             cat >&2 <<'EOF'
 
@@ -129,49 +133,49 @@ EOF
     if command -v apt-get >/dev/null 2>&1; then
         if ! command -v curl >/dev/null 2>&1; then
             echo "  installing curl + ca-certificates..."
-            $SUDO apt-get update -qq || true
-            $SUDO apt-get install -y -qq curl ca-certificates || true
+            $RUN apt-get update -qq || true
+            $RUN apt-get install -y -qq curl ca-certificates || true
         fi
-        # Try NodeSource first (LTS 20.x); on failure fall back to
-        # Ubuntu's nodejs package — older but always works.
-        if curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash -; then
-            if $SUDO apt-get install -y nodejs; then
+        # Try NodeSource first (LTS 20.x); on failure fall back to the
+        # distro's nodejs package (older but reliable).
+        if curl -fsSL https://deb.nodesource.com/setup_20.x | $RUN bash -; then
+            if $RUN apt-get install -y nodejs; then
                 echo "  ✓ installed node $(node --version 2>/dev/null)"
                 return 0
             fi
         fi
         echo "  NodeSource failed; falling back to distro repo (older Node)..."
-        $SUDO apt-get update -qq || true
-        if $SUDO apt-get install -y nodejs npm; then
+        $RUN apt-get update -qq || true
+        if $RUN apt-get install -y nodejs npm; then
             echo "  ✓ installed node $(node --version 2>/dev/null) (distro)"
             return 0
         fi
 
     elif command -v dnf >/dev/null 2>&1; then
-        if curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash - \
-           && $SUDO dnf install -y nodejs; then
+        if curl -fsSL https://rpm.nodesource.com/setup_20.x | $RUN bash - \
+           && $RUN dnf install -y nodejs; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
-        $SUDO dnf install -y nodejs npm && {
+        $RUN dnf install -y nodejs npm && {
             echo "  ✓ installed node $(node --version 2>/dev/null) (distro)"
             return 0
         }
     elif command -v yum >/dev/null 2>&1; then
-        if curl -fsSL https://rpm.nodesource.com/setup_20.x | $SUDO bash - \
-           && $SUDO yum install -y nodejs; then
+        if curl -fsSL https://rpm.nodesource.com/setup_20.x | $RUN bash - \
+           && $RUN yum install -y nodejs; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
 
     elif command -v pacman >/dev/null 2>&1; then
-        if $SUDO pacman -Sy --noconfirm nodejs npm; then
+        if $RUN pacman -Sy --noconfirm nodejs npm; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
 
     elif command -v apk >/dev/null 2>&1; then
-        if $SUDO apk add --no-cache nodejs npm; then
+        if $RUN apk add --no-cache nodejs npm; then
             echo "  ✓ installed node $(node --version 2>/dev/null)"
             return 0
         fi
