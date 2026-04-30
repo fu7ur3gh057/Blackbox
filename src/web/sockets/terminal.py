@@ -108,22 +108,44 @@ class TerminalNamespace(AsyncNamespace):
             log.warning("terminal: refusing %s — auth not configured", sid)
             return False
 
-        token = _extract_token(auth, environ)
-        if not token:
-            log.info("terminal: refusing %s — no token", sid)
+        # Step 1: bb_session cookie — same JWT every other namespace uses.
+        # Confirms the browser is logged in as the web admin.
+        session_token = _extract_token(auth, environ)
+        if not session_token:
+            log.info("terminal: refusing %s — no session token", sid)
             return False
+        from jwt import InvalidTokenError
         try:
-            from jwt import InvalidTokenError
-            try:
-                claims = decode_token(token, secret)
-            except InvalidTokenError as e:
-                log.info("terminal: refusing %s — bad token: %s", sid, e)
-                return False
-        except Exception:
-            log.exception("terminal: token decode crashed")
+            session_claims = decode_token(session_token, secret)
+        except InvalidTokenError as e:
+            log.info("terminal: refusing %s — bad session token: %s", sid, e)
+            return False
+        web_user = session_claims.get("sub", "")
+
+        # Step 2: terminal token — issued by POST /api/terminal/unlock
+        # after a separate username/password check. Must carry aud=terminal.
+        # If `web.terminal.user` isn't configured at all, we refuse — the
+        # operator hasn't opted in to terminal access yet.
+        if broker.state.data.get("terminal_user") is None:
+            log.info("terminal: refusing %s — terminal user not configured", sid)
             return False
 
-        username = claims.get("sub", "")
+        term_token = (auth or {}).get("terminal_token") if isinstance(auth, dict) else None
+        if not term_token:
+            log.info("terminal: refusing %s — no terminal token", sid)
+            return False
+        try:
+            term_claims = decode_token(str(term_token), secret)
+        except InvalidTokenError as e:
+            log.info("terminal: refusing %s — bad terminal token: %s", sid, e)
+            return False
+        if term_claims.get("aud") != "terminal":
+            log.info("terminal: refusing %s — token wrong audience", sid)
+            return False
+
+        # The terminal token's `sub` is the terminal user; we tag the
+        # session with the WEB user so audit + alerts attribute correctly.
+        username = web_user or term_claims.get("sub", "")
 
         # Single-session lock — refuse if user already has a session.
         existing = self._user_to_sid.get(username)

@@ -110,13 +110,17 @@ web:
   port: 8765
   prefix: /blackbox            # URL prefix; "" disables prefixing
 
-  # In-browser terminal — opt-in. Anyone with the admin password gets a
-  # root shell, so default is OFF. Every keystroke is logged to the
-  # `terminal_audit` SQLite table (passwords typed at prompts will end up
-  # there). Single session per user enforced server-side.
+  # In-browser terminal — opt-in, separate credentials from the web admin
+  # (defence in depth: a stolen bb_session cookie alone cannot open a
+  # shell). Every keystroke is logged to `terminal_audit` (passwords
+  # typed at prompts too — guard the DB). Single session per user.
   # terminal:
   #   enabled: true
+  #   user:
+  #     username: blackbox-term
+  #     password_hash: "$2b$12$…"     # bcrypt — generate via the wizard
   #   shell: /bin/bash
   #   cwd: /
   #   audit: true
   #   max_sessions: 1
+  #   token_ttl: 1800                  # seconds; auto-relock after

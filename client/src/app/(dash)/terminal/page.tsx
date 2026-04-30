@@ -1,26 +1,237 @@
 "use client";
 
+import { api, ApiError } from "@/lib/api";
 import { connectNamespace, releaseNamespace } from "@/lib/socket";
 import { cn } from "@/lib/utils";
-import { Terminal as TerminalIcon, Zap, ZapOff } from "lucide-react";
+import { Lock, Terminal as TerminalIcon, Zap, ZapOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-// xterm CSS — side-effect import resolved by Next at build time.
 import "xterm/css/xterm.css";
 
 /**
- * In-browser PTY view backed by xterm.js. The page is a thin shell
- * around a single namespace `/terminal` — the backend is opt-in
- * (`web.terminal.enabled: true`), so if it's off we render a friendly
- * placeholder rather than letting xterm spin trying to handshake.
+ * Two-step access:
  *
- * Layout: sticky header strip with status / disconnect button, the
- * xterm canvas filling the remaining viewport. The fit addon resizes
- * the PTY whenever the container changes (window resize / right-rail
- * toggle), forwarded over WS as `terminal:resize`.
+ *   1. Already-logged-in admin (bb_session cookie) — this page is gated
+ *      behind /(dash) layout's AuthGate so this is implicit.
+ *   2. Separate terminal username + password (`web.terminal.user.*`) —
+ *      submitted to POST /api/terminal/unlock, which returns a short-
+ *      lived token. Only when we hold that token do we mount xterm and
+ *      connect the WS.
+ *
+ * The token lives in component state — closes the tab and it's gone, no
+ * persistent storage. After expiry the next connect attempt fails and we
+ * drop back to the lock screen.
  */
 export default function TerminalPage() {
+  const [enabled, setEnabled] = useState<boolean | null>(null); // null while probing
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenExpiresAt, setTokenExpiresAt] = useState<number | null>(null);
+
+  // Probe /api/terminal/status once to know whether to even show the
+  // lock form. If the daemon doesn't have web.terminal configured we
+  // tell the user up front instead of letting them type a wrong password.
+  useEffect(() => {
+    api.get<{ enabled: boolean; ttl_seconds: number }>("/terminal/status")
+      .then((s) => setEnabled(s.enabled))
+      .catch(() => setEnabled(false));
+  }, []);
+
+  if (enabled === null) {
+    return (
+      <div className="h-[calc(100vh-136px)] flex items-center justify-center">
+        <div className="text-[12px] font-mono text-ink-mute">checking terminal status…</div>
+      </div>
+    );
+  }
+
+  if (!enabled) {
+    return <DisabledState />;
+  }
+
+  if (!token) {
+    return (
+      <LockScreen
+        onUnlocked={(t, ttl) => {
+          setToken(t);
+          setTokenExpiresAt(Date.now() + ttl * 1000);
+        }}
+      />
+    );
+  }
+
+  return (
+    <TerminalSession
+      token={token}
+      tokenExpiresAt={tokenExpiresAt}
+      onLock={() => {
+        setToken(null);
+        setTokenExpiresAt(null);
+      }}
+    />
+  );
+}
+
+// ── disabled placeholder ────────────────────────────────────────────────
+
+
+function DisabledState() {
+  return (
+    <div className="h-[calc(100vh-136px)] flex flex-col gap-3">
+      <Header status="disabled" reason="not configured" />
+      <div className="rounded-card border border-level-warn/30 bg-level-warn/[0.06] px-5 py-4">
+        <div className="text-[12.5px] font-semibold text-level-warn">Terminal disabled</div>
+        <div className="text-[11.5px] text-ink-dim mt-1 leading-relaxed font-mono">
+          Add a credentials block to <span className="text-accent-pale">config.yaml</span> and
+          restart the daemon:
+        </div>
+        <pre className="mt-3 px-3 py-2.5 rounded-lg bg-black/40 border border-white/[0.05] text-[11px] font-mono text-zinc-300 whitespace-pre">
+{`web:
+  terminal:
+    enabled: true
+    user:
+      username: blackbox-term
+      password_hash: "$2b$12$…"   # bcrypt — generate via the wizard
+    shell: /bin/bash
+    cwd: /
+    audit: true
+    max_sessions: 1
+    token_ttl: 1800`}
+        </pre>
+        <div className="text-[10.5px] text-ink-mute font-mono mt-3">
+          easiest path: re-run <span className="text-accent-pale">make setup</span> and answer
+          yes to the terminal prompt — it generates the bcrypt hash for you.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── lock screen ─────────────────────────────────────────────────────────
+
+
+function LockScreen({ onUnlocked }: { onUnlocked: (token: string, ttlSeconds: number) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!username || !password) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ token: string; expires_in: number }>(
+        "/terminal/unlock",
+        { username, password },
+      );
+      onUnlocked(res.token, res.expires_in);
+    } catch (e) {
+      const msg = e instanceof ApiError && e.status === 401
+        ? "invalid credentials"
+        : (e as Error).message || "unlock failed";
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="h-[calc(100vh-136px)] flex flex-col gap-3">
+      <Header status="locked" reason="enter terminal credentials" />
+      <div className="flex-1 min-h-0 flex items-center justify-center">
+        <form
+          onSubmit={submit}
+          className={cn(
+            "w-[360px] max-w-full rounded-card border border-white/[0.06] bg-canvas-elev",
+            "px-6 py-7 space-y-4",
+          )}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-accent-pale/[0.10] text-accent-pale flex items-center justify-center">
+              <Lock size={14} strokeWidth={1.8} />
+            </div>
+            <div>
+              <div className="text-[13.5px] font-semibold text-ink-strong">Terminal locked</div>
+              <div className="text-[10.5px] font-mono text-ink-mute">
+                separate credentials from the web admin
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-mute font-mono">username</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoFocus
+                className={cn(
+                  "mt-1 w-full px-3 py-2 rounded-lg",
+                  "bg-black/40 border border-white/[0.06] font-mono text-[12px] text-ink-strong",
+                  "focus:outline-none focus:border-accent-pale/50",
+                )}
+              />
+            </label>
+            <label className="block">
+              <span className="text-[10px] uppercase tracking-[0.16em] text-ink-mute font-mono">password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className={cn(
+                  "mt-1 w-full px-3 py-2 rounded-lg",
+                  "bg-black/40 border border-white/[0.06] font-mono text-[12px] text-ink-strong",
+                  "focus:outline-none focus:border-accent-pale/50",
+                )}
+              />
+            </label>
+          </div>
+
+          {error && (
+            <div className="rounded-lg bg-level-crit/12 ring-1 ring-level-crit/30 text-level-crit text-[11px] font-mono px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy || !username || !password}
+            className={cn(
+              "w-full h-10 rounded-xl font-mono text-[12px] uppercase tracking-[0.16em]",
+              "bg-accent-pale/15 text-accent-pale border border-accent-pale/30",
+              "hover:bg-accent-pale/25 transition-colors",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
+            {busy ? "unlocking…" : "unlock"}
+          </button>
+
+          <div className="text-[10px] font-mono text-ink-mute leading-relaxed pt-1">
+            failed attempts logged · single session enforced · every keystroke audited
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── live session ────────────────────────────────────────────────────────
+
+
+function TerminalSession({
+  token,
+  tokenExpiresAt,
+  onLock,
+}: {
+  token: string;
+  tokenExpiresAt: number | null;
+  onLock: () => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<"connecting" | "open" | "disabled" | "denied" | "closed">("connecting");
+  const [status, setStatus] = useState<"connecting" | "open" | "denied" | "closed">("connecting");
   const [reason, setReason] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,12 +239,10 @@ export default function TerminalPage() {
     let dispose: (() => void) | null = null;
 
     (async () => {
-      // Dynamic import — xterm pulls ~150KB and is only needed here.
       const [{ Terminal }, { FitAddon }] = await Promise.all([
         import("xterm"),
         import("xterm-addon-fit"),
       ]);
-
       if (disposed || !containerRef.current) return;
 
       const term = new Terminal({
@@ -71,16 +280,16 @@ export default function TerminalPage() {
       term.open(containerRef.current);
 
       const sock = connectNamespace("/terminal");
+      // Pass the terminal token in the auth payload — the namespace
+      // also reads bb_session from environ.cookie automatically.
+      sock.auth = { terminal_token: token };
 
       const sendResize = () => {
         try {
           fit.fit();
           sock.emit("resize", { cols: term.cols, rows: term.rows });
-        } catch {
-          /* container not ready yet — next ResizeObserver tick will retry */
-        }
+        } catch { /* not ready yet */ }
       };
-      // Initial fit, then sync on every container size change.
       requestAnimationFrame(sendResize);
       const ro = new ResizeObserver(sendResize);
       ro.observe(containerRef.current);
@@ -91,20 +300,14 @@ export default function TerminalPage() {
         sendResize();
       };
       const onConnectError = (err: Error) => {
-        // Backend refused — most commonly because the namespace isn't
-        // registered (terminal.enabled is false on the server).
-        setStatus(err.message?.includes("not exist") || err.message?.includes("Invalid namespace")
-          ? "disabled"
-          : "denied");
+        setStatus("denied");
         setReason(err.message || null);
       };
-      const onDisconnect = (reason: string) => {
+      const onDisconnect = (r: string) => {
         setStatus("closed");
-        setReason(reason);
+        setReason(r);
       };
-      const onOutput = (payload: { data: string }) => {
-        term.write(payload.data);
-      };
+      const onOutput = (payload: { data: string }) => term.write(payload.data);
       const onExit = (payload: { reason: string }) => {
         term.write(`\r\n\x1b[33m[ session ended: ${payload.reason} ]\x1b[0m\r\n`);
       };
@@ -119,6 +322,10 @@ export default function TerminalPage() {
         if (sock.connected) sock.emit("input", { data });
       });
 
+      // Force the (re)connect now — sock.connect() is idempotent and
+      // makes sure the new auth payload is used.
+      if (!sock.connected) sock.connect();
+
       dispose = () => {
         ro.disconnect();
         sock.off("connect", onConnect);
@@ -131,7 +338,7 @@ export default function TerminalPage() {
       };
     })().catch((e) => {
       console.error("terminal init failed", e);
-      setStatus("disabled");
+      setStatus("denied");
       setReason("xterm.js failed to load");
     });
 
@@ -139,76 +346,80 @@ export default function TerminalPage() {
       disposed = true;
       dispose?.();
     };
-  }, []);
+  }, [token]);
+
+  // Auto-relock on token expiry — drop back to the lock screen.
+  useEffect(() => {
+    if (!tokenExpiresAt) return;
+    const ms = Math.max(0, tokenExpiresAt - Date.now());
+    const t = setTimeout(onLock, ms);
+    return () => clearTimeout(t);
+  }, [tokenExpiresAt, onLock]);
 
   return (
     <div className="h-[calc(100vh-136px)] flex flex-col gap-3">
-      <Header status={status} reason={reason} />
+      <Header status={status} reason={reason} onLock={onLock} />
       <div className="flex-1 min-h-0 rounded-card border border-white/[0.05] bg-canvas-elev overflow-hidden">
         <div ref={containerRef} className="h-full w-full p-2" />
       </div>
-      {(status === "disabled" || status === "denied") && (
-        <Overlay status={status} reason={reason} />
-      )}
     </div>
   );
 }
 
-function Header({ status, reason }: { status: string; reason: string | null }) {
+// ── header strip ────────────────────────────────────────────────────────
+
+
+function Header({
+  status, reason, onLock,
+}: {
+  status: string;
+  reason: string | null;
+  onLock?: () => void;
+}) {
   const cfg = {
     connecting: { Icon: Zap,    tone: "text-level-warn",  label: "connecting" },
     open:       { Icon: Zap,    tone: "text-accent-pale", label: "live" },
     closed:     { Icon: ZapOff, tone: "text-ink-mute",    label: "closed" },
     denied:     { Icon: ZapOff, tone: "text-level-crit",  label: "denied" },
     disabled:   { Icon: ZapOff, tone: "text-ink-mute",    label: "disabled" },
+    locked:     { Icon: Lock,   tone: "text-accent-pale", label: "locked" },
   }[status] ?? { Icon: ZapOff, tone: "text-ink-mute", label: status };
 
   return (
     <div className="rounded-card border border-white/[0.05] bg-canvas-elev px-4 py-2.5 flex items-center justify-between">
       <div className="flex items-center gap-3">
-        <div className="h-8 w-8 rounded-xl bg-accent-green/12 text-accent-pale flex items-center justify-center">
+        <div className="h-8 w-8 rounded-xl bg-accent-pale/[0.10] text-accent-pale flex items-center justify-center">
           <TerminalIcon size={14} strokeWidth={1.8} />
         </div>
         <div>
           <h1 className="text-[14px] font-semibold text-ink-strong tracking-tight">Terminal</h1>
           <p className="text-[10.5px] font-mono text-ink-mute">
-            web shell · single session · audited
+            two-step auth · single session · audited
           </p>
         </div>
       </div>
-      <div className={cn("inline-flex items-center gap-2 px-3 py-1 rounded-full font-mono text-[11px]",
-        "bg-white/[0.04] ring-1 ring-white/[0.06]", cfg.tone)}>
-        <cfg.Icon size={11} />
-        <span className="uppercase tracking-[0.16em]">{cfg.label}</span>
-        {reason && status !== "open" && (
-          <span className="text-ink-mute text-[10px] ml-1 truncate max-w-[200px]">
-            · {reason}
-          </span>
+      <div className="flex items-center gap-2">
+        {onLock && status === "open" && (
+          <button
+            type="button"
+            onClick={onLock}
+            className="text-[11px] font-mono text-ink-dim hover:text-level-crit transition-colors px-2 py-1 rounded ring-1 ring-white/[0.06]"
+            title="end session and re-lock"
+          >
+            lock
+          </button>
         )}
+        <div className={cn("inline-flex items-center gap-2 px-3 py-1 rounded-full font-mono text-[11px]",
+          "bg-white/[0.04] ring-1 ring-white/[0.06]", cfg.tone)}>
+          <cfg.Icon size={11} />
+          <span className="uppercase tracking-[0.16em]">{cfg.label}</span>
+          {reason && status !== "open" && (
+            <span className="text-ink-mute text-[10px] ml-1 truncate max-w-[200px]">
+              · {reason}
+            </span>
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
-
-function Overlay({ status, reason }: { status: "disabled" | "denied"; reason: string | null }) {
-  const txt = status === "disabled"
-    ? {
-        title: "Terminal disabled",
-        body:
-          "The /terminal namespace isn't mounted. Add `terminal: { enabled: true }` to the `web:` block of config.yaml and restart the daemon.",
-      }
-    : {
-        title: "Connection refused",
-        body:
-          reason?.includes("session active")
-            ? "Another session is already active for your account. Close the other tab/window and try again."
-            : (reason ?? "Backend refused the connection — check JWT cookie and server logs."),
-      };
-
-  return (
-    <div className="rounded-card border border-level-warn/30 bg-level-warn/[0.06] px-5 py-4">
-      <div className="text-[12.5px] font-semibold text-level-warn">{txt.title}</div>
-      <div className="text-[11.5px] text-ink-dim mt-1 leading-relaxed">{txt.body}</div>
     </div>
   );
 }
