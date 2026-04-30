@@ -1,8 +1,10 @@
 "use client";
 
+import { fmtTime, sourceHue } from "@/components/logs/format";
 import { api } from "@/lib/api";
 import { connectNamespace, releaseNamespace } from "@/lib/socket";
 import type { AlertEvent, CheckSummary, Level, NotifierInfo } from "@/lib/types";
+import { useLogStream } from "@/lib/use-log-stream";
 import { useChecksSnapshot, useSystemSnapshot } from "@/lib/use-snapshot";
 import { useWsStatus } from "@/lib/use-ws-status";
 import { cn, relativeTime } from "@/lib/utils";
@@ -15,6 +17,7 @@ import {
   Send,
   Settings,
   ShieldCheck,
+  Terminal,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -26,7 +29,8 @@ import { useEffect, useState } from "react";
  * the dashboard sidebar at once. Top-to-bottom:
  *   • Status strip   ws-dot · clock · worst-level pill
  *   • Mini gauges    horizontal CPU / RAM / SWAP bars
- *   • Recent alerts  scrollable feed (live)
+ *   • Recent alerts  scrollable feed (live)         ← upper half
+ *   • Recent logs    scrollable feed (live)         ← lower half
  *   • Quick actions  run all / test alert / refresh
  *   • Footer         settings (placeholder)
  */
@@ -36,7 +40,14 @@ export function RightColumn() {
       <StatusStrip />
       <MiniGauges />
       <div className="h-px bg-white/[0.06]" />
-      <RecentAlertsFeed />
+      {/* Alerts + logs share the remaining tall area 50/50. Each child
+          uses flex-1 min-h-0 so an overflowing list scrolls inside its
+          own pane instead of pushing the column out. */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4">
+        <RecentAlertsFeed />
+        <div className="h-px bg-white/[0.06]" />
+        <RecentLogsFeed />
+      </div>
       <div className="h-px bg-white/[0.06]" />
       <QuickActions />
       <SettingsRow />
@@ -238,6 +249,72 @@ function RecentAlertsFeed() {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── recent logs feed ──────────────────────────────────────────────────────
+
+function RecentLogsFeed() {
+  const stream = useLogStream(30);
+  // Newest-first slice — `lines` is chronological in the buffer, reverse
+  // for display so the freshest hit lands at the top alongside the
+  // alerts feed above.
+  const recent = stream.lines.slice(-12).reverse();
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col gap-2.5">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-ink-dim font-mono">
+          <Terminal size={11} className="text-accent-pale" />
+          Recent logs
+        </h3>
+        <Link
+          href="/logs"
+          className="text-[10px] text-ink-mute hover:text-accent-pale transition-colors font-mono"
+        >
+          {stream.lines.length}{" "}
+          <span className="text-ink-mute">·</span>{" "}
+          <span className="underline decoration-dotted underline-offset-2">view all</span>
+        </Link>
+      </div>
+
+      <div className="flex-1 overflow-y-auto pr-1 rounded-lg bg-black/30 border border-white/[0.04]">
+        {recent.length === 0 ? (
+          <div className="text-[11px] text-ink-mute text-center py-8 font-mono">
+            <Terminal size={16} className="mx-auto mb-1.5 opacity-40" />
+            waiting for log lines…
+          </div>
+        ) : (
+          <div className="divide-y divide-white/[0.025]">
+            {recent.map((l, i) => {
+              const hue = sourceHue(l.source);
+              return (
+                <div
+                  key={`${l.ts}-${i}`}
+                  className="flex items-center gap-2 px-2.5 py-1.5 font-mono text-[11px] hover:bg-white/[0.02] transition-colors"
+                >
+                  <span className="text-ink-mute tabular-nums shrink-0 text-[10px]">
+                    {fmtTime(l.ts)}
+                  </span>
+                  <span className={cn("inline-flex items-center gap-1 shrink-0", hue.fg)}>
+                    <span className={cn("h-1.5 w-1.5 rounded-full", hue.dot)} />
+                    <span className="truncate text-[9.5px] uppercase tracking-wider max-w-[60px]">
+                      {l.source}
+                    </span>
+                  </span>
+                  {l.first && (
+                    <span className="shrink-0 px-1 py-[0.5px] rounded text-[8.5px] font-bold tracking-wider bg-accent-pale/15 text-accent-pale ring-1 ring-accent-pale/30">
+                      NEW
+                    </span>
+                  )}
+                  <span className="flex-1 min-w-0 truncate text-zinc-300">{l.line}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
