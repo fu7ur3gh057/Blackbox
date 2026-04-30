@@ -78,6 +78,7 @@ logs:
       compose: /opt/goda/docker-compose.yaml
       service: goda-platform
       pattern: "ERROR|CRITICAL|Traceback"
+      poll_interval: 60          # seconds, how often to pull new lines (default 60)
     - type: journal
       name: nginx-systemd
       unit: nginx.service

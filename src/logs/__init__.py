@@ -50,6 +50,7 @@ def build_log_processor(
                 sources.append(DockerLogSource(
                     name=s["name"], compose=s["compose"], service=s["service"],
                     pattern=s.get("pattern", ".+"),
+                    poll_interval=float(s.get("poll_interval", 60)),
                 ))
             elif kind == "journal":
                 sources.append(JournalLogSource(
