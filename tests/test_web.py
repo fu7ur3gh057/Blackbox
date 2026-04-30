@@ -87,11 +87,11 @@ def test_cors_allows_nextjs_dev_origin():
         r = client.options(
             "/api/status",
             headers={
-                "Origin": "http://localhost:3000",
+                "Origin": "http://localhost:8677",
                 "Access-Control-Request-Method": "GET",
             },
         )
-    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:8677"
 
 
 def test_cors_rejects_unknown_origin():
@@ -109,10 +109,15 @@ def test_cors_rejects_unknown_origin():
 
 # ── client placeholder when not built ──────────────────────────────────────
 
-def test_client_placeholder_when_not_built():
+def test_client_placeholder_when_not_built(monkeypatch, tmp_path):
     """If client/out doesn't exist, the prefix root serves a small HTML
     page that tells the operator how to build the bundle. /api/* must
-    keep working regardless."""
+    keep working regardless. We point _CLIENT_OUT at an empty tmp dir to
+    cover the placeholder branch even when the dev tree happens to have
+    a real built client/out (CI vs. local)."""
+    import web.application as web_app
+    monkeypatch.setattr(web_app, "_CLIENT_OUT", tmp_path / "missing-out")
+
     app = get_app(prefix="/blackbox")
     with TestClient(app) as client:
         r = client.get("/blackbox/")
