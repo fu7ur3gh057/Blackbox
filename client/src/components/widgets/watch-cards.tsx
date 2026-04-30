@@ -1,6 +1,7 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
+import { Tip } from "@/components/ui/tooltip";
 import { useDockerSnapshot } from "@/lib/use-snapshot";
 import { cn } from "@/lib/utils";
 import { Boxes, AlertCircle, ChevronRight } from "lucide-react";
@@ -81,16 +82,25 @@ export function WatchCards() {
                         const name = c.Service ?? c.Name ?? "?";
                         const dot = STATE_DOT[c.State ?? ""] ?? "bg-ink-mute";
                         return (
-                          <div
+                          <Tip
                             key={i}
-                            title={`${name} · ${c.State}`}
-                            className={cn(
-                              "relative h-7 w-7 rounded-full bg-canvas-elev border-2 border-canvas flex items-center justify-center text-[10px] font-medium text-ink",
-                            )}
+                            text={
+                              <span className="inline-flex items-center gap-2">
+                                <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+                                <span className="font-semibold">{name}</span>
+                                <span className="text-ink-dim">{c.State}</span>
+                              </span>
+                            }
                           >
-                            {name[0]?.toUpperCase()}
-                            <span className={cn("absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-canvas", dot)} />
-                          </div>
+                            <div
+                              className={cn(
+                                "relative h-7 w-7 rounded-full bg-canvas-elev border-2 border-canvas flex items-center justify-center text-[10px] font-medium text-ink",
+                              )}
+                            >
+                              {name[0]?.toUpperCase()}
+                              <span className={cn("absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full ring-1 ring-canvas", dot)} />
+                            </div>
+                          </Tip>
                         );
                       })}
                     </div>

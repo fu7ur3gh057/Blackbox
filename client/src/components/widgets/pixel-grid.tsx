@@ -1,10 +1,12 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
+import { FloatingTip } from "@/components/ui/tooltip";
 import { api } from "@/lib/api";
 import type { AlertEvent } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 const HOURS = 24;
 
@@ -43,6 +45,12 @@ export function PixelGrid() {
 
   // SVG canvas: 24 bars over a 240×60 stage gives 8px wide bars + 2px gap.
   const W = 240, H = 60, BAR = 8, GAP = 2;
+  // Hover state — viewport coords for the FloatingTip + bucket payload.
+  const [hover, setHover] = useState<{
+    bucket: { count: number; crit: number; warn: number };
+    label: string;
+    vx: number; vy: number;
+  } | null>(null);
 
   return (
     <Panel className="overflow-hidden">
@@ -99,11 +107,18 @@ export function PixelGrid() {
                 : empty ? "rgba(255,255,255,0.05)"
                 : "url(#bar-cool)";
 
+              const label = HOURS - 1 - i === 0 ? "now" : `${HOURS - 1 - i}h ago`;
               return (
-                <g key={i}>
-                  <title>
-                    {`${HOURS - 1 - i === 0 ? "now" : `${HOURS - 1 - i}h ago`} · ${b.count} alerts`}
-                  </title>
+                <g
+                  key={i}
+                  onMouseEnter={(e) => setHover({ bucket: b, label, vx: e.clientX, vy: e.clientY })}
+                  onMouseMove={(e) => setHover({ bucket: b, label, vx: e.clientX, vy: e.clientY })}
+                  onMouseLeave={() => setHover((h) => (h?.label === label ? null : h))}
+                  style={{ cursor: "pointer" }}
+                >
+                  {/* invisible wider hit-target — the visible bar can be
+                      as thin as 8px which is awkward for hover */}
+                  <rect x={x - GAP / 2} y={0} width={BAR + GAP} height={H} fill="transparent" />
                   <rect
                     x={x}
                     y={H - h}
@@ -158,6 +173,34 @@ export function PixelGrid() {
               </rect>
             </g>
           </svg>
+
+          {hover && (
+            <FloatingTip
+              x={hover.vx}
+              y={hover.vy}
+              side="top"
+              text={
+                <span className="inline-flex items-center gap-2">
+                  <span className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    hover.bucket.crit > 0 ? "bg-level-crit"
+                      : hover.bucket.warn > 0 ? "bg-level-warn"
+                      : hover.bucket.count > 0 ? "bg-level-ok"
+                      : "bg-ink-mute",
+                  )} />
+                  <span className="font-semibold text-ink-strong">{hover.label}</span>
+                  <span className="text-ink-dim tabular-nums">
+                    {hover.bucket.count} alert{hover.bucket.count === 1 ? "" : "s"}
+                  </span>
+                  {hover.bucket.crit > 0 && (
+                    <span className="text-level-crit text-[10px] uppercase tracking-wider">
+                      {hover.bucket.crit} crit
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          )}
         </div>
 
         <div className="flex items-center justify-between mt-2 text-[10px] font-mono text-ink-mute">

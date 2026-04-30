@@ -1,5 +1,6 @@
 "use client";
 
+import { Tip } from "@/components/ui/tooltip";
 import { auth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, ChevronDown, LogOut, Search } from "lucide-react";
@@ -48,9 +49,11 @@ export function TopHeader() {
             <div className="text-ink-mute text-[10px]">admin</div>
           </div>
           <ChevronDown size={13} className="text-ink-mute" />
-          <button onClick={onLogout} className="ml-1 text-ink-mute hover:text-accent-bright transition" title="logout">
-            <LogOut size={12} />
-          </button>
+          <Tip text="log out" side="bottom">
+            <button onClick={onLogout} className="ml-1 text-ink-mute hover:text-accent-bright transition">
+              <LogOut size={12} />
+            </button>
+          </Tip>
         </div>
       </div>
     </header>

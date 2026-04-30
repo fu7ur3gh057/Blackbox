@@ -1,8 +1,11 @@
 "use client";
 
 import { Panel, PanelBody, PanelHeader, PanelTitle } from "@/components/ui/card";
+import { FloatingTip } from "@/components/ui/tooltip";
 import type { CheckSummary, Level } from "@/lib/types";
 import { useChecksSnapshot } from "@/lib/use-snapshot";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const LEVEL: Record<Level, { fill: string; ring: string; glowColor: string }> = {
   ok:   { fill: "#E0E0E5", ring: "#E0E0E5", glowColor: "rgba(224,224,229,0.55)" },
@@ -41,6 +44,10 @@ export function NodeWeb() {
   const checks = data && data.length > 0 ? data : DUMMY;
   const n = checks.length;
   const isPreview = !data || data.length === 0;
+  // Hovered node — drives the project-themed FloatingTip. We track the
+  // SVG-local coords + the cursor's viewport coords so the tooltip can
+  // be portal'd to <body> with correct fixed positioning.
+  const [hover, setHover] = useState<{ check: CheckSummary; vx: number; vy: number } | null>(null);
 
   return (
     <Panel className="overflow-hidden flex flex-col">
@@ -149,7 +156,13 @@ export function NodeWeb() {
               const driftDur = 4 + (i % 3) * 0.7;
               const haloDelay = i * 0.25;
               return (
-                <g key={`node-${i}`}>
+                <g
+                  key={`node-${i}`}
+                  onMouseEnter={(e) => setHover({ check: c, vx: e.clientX, vy: e.clientY })}
+                  onMouseMove={(e) => setHover({ check: c, vx: e.clientX, vy: e.clientY })}
+                  onMouseLeave={() => setHover((h) => (h?.check.name === c.name ? null : h))}
+                  style={{ cursor: "pointer" }}
+                >
                   {/* drift wrapper — node + halo gently slide along their
                       own short tangent so the diagram breathes */}
                   <g>
@@ -176,6 +189,11 @@ export function NodeWeb() {
                     {/* glow blob behind core */}
                     <circle cx={x} cy={y} r="6" fill={t.glowColor} opacity="0.55" />
 
+                    {/* invisible hit target — slightly bigger than the
+                        visible core so hover catches reliably even when
+                        the drift transform shifts the node a couple px. */}
+                    <circle cx={x} cy={y} r="10" fill="transparent" />
+
                     {/* node core */}
                     <circle
                       cx={x} cy={y} r="4.6"
@@ -186,11 +204,6 @@ export function NodeWeb() {
                     {/* highlight glint */}
                     <circle cx={x - 1.2} cy={y - 1.2} r="0.8" fill="#FFFFFF" opacity="0.6" />
                   </g>
-
-                  {/* tooltip via <title> child */}
-                  <title>
-                    {`${c.name} · ${c.level ?? "—"}${c.last_value != null ? ` · ${c.last_value.toFixed(0)}%` : ""}`}
-                  </title>
                 </g>
               );
             })}
@@ -226,6 +239,33 @@ export function NodeWeb() {
               </text>
             </g>
           </svg>
+
+          {hover && (
+            <FloatingTip
+              x={hover.vx}
+              y={hover.vy}
+              side="top"
+              text={
+                <span className="inline-flex items-center gap-2">
+                  <span className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    hover.check.level === "crit" ? "bg-level-crit"
+                      : hover.check.level === "warn" ? "bg-level-warn"
+                      : "bg-level-ok",
+                  )} />
+                  <span className="font-semibold text-ink-strong">{hover.check.name}</span>
+                  <span className="text-[10px] text-ink-mute uppercase tracking-wider">
+                    {hover.check.level ?? "—"}
+                  </span>
+                  {hover.check.last_value != null && (
+                    <span className="text-ink-dim tabular-nums">
+                      {hover.check.last_value.toFixed(0)}%
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          )}
         </div>
       </PanelBody>
     </Panel>
