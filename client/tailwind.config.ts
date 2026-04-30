@@ -5,39 +5,34 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: {
-          base:    "#07080B",
-          surface: "#13151B",
-          elev:    "#1A1D25",
-          input:   "#15171E",
+        cream: {
+          DEFAULT: "#ECE0CB",
+          deep:    "#E2D6BD",
+          card:    "#F0E5CC",
         },
-        border: {
-          DEFAULT: "rgba(255,255,255,0.08)",
-          soft:    "rgba(255,255,255,0.05)",
+        canvas: {
+          DEFAULT: "#0F1119",
+          elev:    "#181B26",
+          elev2:   "#212431",
+          line:    "#272A37",
+        },
+        ink: {
+          strong: "#F0E5CC",
+          DEFAULT: "#E5E1D6",
+          dim:    "#A09A8C",
+          mute:   "#6E6E7A",
         },
         accent: {
-          DEFAULT: "#F97316",
-          soft:    "#FDBA74",
-          glow:    "rgba(249, 115, 22, 0.20)",
-        },
-        violet: {
-          accent: "#A78BFA",
-          glow:   "rgba(167,139,250,0.20)",
-        },
-        cyan: {
-          accent: "#22D3EE",
-          glow:   "rgba(34,211,238,0.20)",
-        },
-        text: {
-          strong: "#F4F4F5",
-          DEFAULT: "#D4D4D8",
-          dim:    "#9CA3AF",
-          mute:   "#6B7280",
+          lavender:        "#C4B5FD",
+          lavender_strong: "#A78BFA",
+          pink:            "#F0ABFC",
+          peach:           "#F4B788",
+          mint:            "#A7F3D0",
         },
         level: {
-          ok:   "#34D399",
-          warn: "#FBBF24",
-          crit: "#F87171",
+          ok:   "#86EFAC",
+          warn: "#FDE68A",
+          crit: "#FCA5A5",
         },
       },
       fontFamily: {
@@ -45,12 +40,13 @@ const config: Config = {
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       borderRadius: {
-        card: "1.5rem",
+        canvas: "2.25rem",
+        card:   "1.25rem",
       },
       boxShadow: {
-        glow:        "0 0 80px -24px rgba(249, 115, 22, 0.55)",
-        "glow-vio":  "0 0 80px -24px rgba(167, 139, 250, 0.55)",
-        "glow-cyan": "0 0 80px -24px rgba(34, 211, 238, 0.45)",
+        canvas: "0 24px 60px -24px rgba(15, 17, 25, 0.45)",
+        chip:   "0 8px 24px -10px rgba(167, 139, 250, 0.5)",
+        soft:   "0 2px 12px rgba(0,0,0,0.18)",
       },
     },
   },

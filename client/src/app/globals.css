@@ -3,125 +3,91 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html, body {
-  background: #07080B;
-  color: #F4F4F5;
+  background:
+    radial-gradient(80% 50% at 50% 0%, #F0E5CC 0%, #E2D6BD 100%);
+  color: #0F1119;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   font-feature-settings: "cv11", "ss01", "ss03";
   min-height: 100vh;
-  overflow-x: hidden;
 }
 
-/* Multi-layer atmospheric background. Saturated radials behind every
-   surface so the glass blur has something colourful to mush around — the
-   iOS "liquid glass" trick only reads as glass when the layer below is
-   actually rich. */
+/* Subtle paper grain on the cream surround */
 body::before {
-  content: "";
-  position: fixed;
-  inset: -20%;
-  pointer-events: none;
-  z-index: -2;
-  background:
-    radial-gradient(circle at 12% 8%,   rgba(249, 115, 22, 0.32) 0%, transparent 35%),
-    radial-gradient(circle at 88% 100%, rgba(139, 92, 246, 0.28) 0%, transparent 40%),
-    radial-gradient(circle at 70% 0%,   rgba(232, 121, 249, 0.16) 0%, transparent 30%),
-    radial-gradient(circle at 0% 100%,  rgba(34, 211, 238, 0.10) 0%, transparent 38%),
-    radial-gradient(circle at 50% 50%,  rgba(99, 102, 241, 0.05) 0%, transparent 60%);
-  filter: blur(40px);
-}
-
-/* Subtle film grain — keeps gradients from banding on cheap monitors. */
-body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: -1;
-  opacity: 0.03;
+  z-index: 0;
+  opacity: 0.05;
   background-image:
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  mix-blend-mode: multiply;
 }
 
-::-webkit-scrollbar { width: 10px; height: 10px; }
+/* Scrollbars: dim, narrow */
+::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 8px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
 
-/* Hero-number glows — these need to read as actual light, not just text. */
-.text-glow-accent { filter: drop-shadow(0 0 28px rgba(249,115,22,0.65)); }
-.text-glow-violet { filter: drop-shadow(0 0 28px rgba(167,139,250,0.60)); }
-.text-glow-cyan   { filter: drop-shadow(0 0 28px rgba(34,211,238,0.55)); }
-.text-glow-warn   { filter: drop-shadow(0 0 22px rgba(251,191,36,0.55)); }
-.text-glow-crit   { filter: drop-shadow(0 0 24px rgba(248,113,113,0.65)); }
-
+/* The dark canvas — main inset surface, atmospheric tint inside */
 @layer components {
-  /* iOS-style glass: strong backdrop blur + saturation boost, thin
-     inner highlight on top edge, very translucent base so the
-     coloured background reads through. */
-  .glass {
-    @apply relative rounded-card overflow-hidden;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 28%, rgba(255,255,255,0.01) 100%),
-      rgba(18, 20, 26, 0.45);
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(36px) saturate(180%) brightness(105%);
-    -webkit-backdrop-filter: blur(36px) saturate(180%) brightness(105%);
-    box-shadow:
-      0 1px 0 0 rgba(255,255,255,0.10) inset,    /* light catches top edge */
-      0 -1px 0 0 rgba(255,255,255,0.02) inset,   /* faint bottom rim */
-      0 24px 60px -28px rgba(0,0,0,0.65);
+  .canvas {
+    @apply relative bg-canvas rounded-canvas overflow-hidden text-ink;
+    box-shadow: 0 30px 60px -32px rgba(15, 17, 25, 0.55);
   }
-  /* Subtle radial sheen on top-left, like real glass picking up a window */
-  .glass::before {
+  .canvas::before {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: radial-gradient(140% 90% at 0% 0%, rgba(255,255,255,0.06) 0%, transparent 45%);
+    background:
+      radial-gradient(60% 35% at 25% 8%, rgba(196, 181, 253, 0.08) 0%, transparent 60%),
+      radial-gradient(40% 35% at 90% 100%, rgba(240, 171, 252, 0.06) 0%, transparent 65%);
   }
-  /* Inner-card variant — less prominent, used inside another glass card */
-  .glass-inner {
-    @apply rounded-2xl border border-white/[0.06];
-    background: rgba(255,255,255,0.025);
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
+
+  /* Card on the dark canvas — elevated surface */
+  .panel {
+    @apply relative rounded-card bg-canvas-elev border border-white/[0.04];
   }
-  /* Pill — toggle / range / status */
+  .panel-flat {
+    @apply relative rounded-card bg-canvas-elev/60 border border-white/[0.03];
+  }
+
+  /* Pills */
   .pill {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium;
   }
-  .pill-soft-ok   { @apply pill bg-emerald-400/10 text-emerald-300 border border-emerald-400/20; }
-  .pill-soft-warn { @apply pill bg-amber-400/10  text-amber-300  border border-amber-400/25; }
-  .pill-soft-crit { @apply pill bg-rose-400/10   text-rose-300   border border-rose-400/30; }
+  .pill-active {
+    @apply pill bg-accent-lavender text-canvas font-semibold shadow-chip;
+  }
+  .pill-ghost {
+    @apply pill bg-white/[0.04] text-ink-dim border border-white/[0.06];
+  }
+
+  /* Dotted divider used between list rows */
+  .dotted-row { background-image: linear-gradient(90deg, rgba(255,255,255,0.18) 50%, transparent 0); background-size: 8px 1px; background-repeat: repeat-x; }
 }
 
-/* Recharts tooltip — match the glass language */
+/* Recharts tooltip — match cream/lavender mood */
 .recharts-default-tooltip {
-  background: rgba(18, 20, 26, 0.85) !important;
-  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(33, 36, 49, 0.95) !important;
+  border: 1px solid rgba(196, 181, 253, 0.20) !important;
   border-radius: 12px !important;
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px) !important;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
 }
 .recharts-tooltip-label, .recharts-tooltip-item {
-  color: #F4F4F5 !important;
+  color: #F0E5CC !important;
 }
 
-/* Pulse for live-status dots */
-@keyframes pulse-ring {
-  0%   { box-shadow: 0 0 0 0   rgba(34, 197, 94, 0.55); }
-  70%  { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
-  100% { box-shadow: 0 0 0 0   rgba(34, 197, 94, 0); }
+/* Pulse for live dots */
+@keyframes pulse-dot {
+  0%   { box-shadow: 0 0 0 0   rgba(196, 181, 253, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(196, 181, 253, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(196, 181, 253, 0); }
 }
-.pulse-ok   { animation: pulse-ring 2.2s ease-out infinite; }
-@keyframes pulse-crit {
-  0%   { box-shadow: 0 0 0 0   rgba(248,113,113,0.55); }
-  70%  { box-shadow: 0 0 0 10px rgba(248,113,113,0); }
-  100% { box-shadow: 0 0 0 0   rgba(248,113,113,0); }
-}
-.pulse-crit { animation: pulse-crit 1.6s ease-out infinite; }
+.pulse-lavender { animation: pulse-dot 2s ease-out infinite; }

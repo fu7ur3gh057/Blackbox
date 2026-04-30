@@ -1,35 +1,34 @@
 import { cn } from "@/lib/utils";
 import * as React from "react";
 
-/**
- * Glass card — single visual primitive for the dashboard. The glass-y
- * feel comes from `globals.css :: .glass` (backdrop-blur + saturate +
- * top-edge highlight). Compose padded sub-zones via CardHeader/Body.
- */
-export const Card = React.forwardRef<
+/** Panel — small elevated card on the dark canvas. */
+export const Panel = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("glass", className)} {...props} />
+  <div ref={ref} className={cn("panel", className)} {...props} />
 ));
-Card.displayName = "Card";
+Panel.displayName = "Panel";
 
-export function CardHeader({ className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("relative px-6 pt-5", className)} {...rest} />;
+export function PanelHeader({ className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("relative px-5 pt-4", className)} {...rest} />;
 }
 
-export function CardBody({ className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("relative px-6 pb-6", className)} {...rest} />;
+export function PanelBody({ className, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("relative px-5 pb-5", className)} {...rest} />;
 }
 
-export function CardTitle({ className, ...rest }: React.HTMLAttributes<HTMLHeadingElement>) {
+export function PanelTitle({ className, ...rest }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn(
-        "text-[11px] font-medium uppercase tracking-[0.14em] text-text-dim",
-        className,
-      )}
+      className={cn("text-[14px] font-semibold tracking-tight text-ink-strong", className)}
       {...rest}
     />
   );
 }
+
+/* Backwards-compat exports */
+export const Card = Panel;
+export const CardHeader = PanelHeader;
+export const CardBody = PanelBody;
+export const CardTitle = PanelTitle;
