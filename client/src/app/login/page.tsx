@@ -38,7 +38,7 @@ export default function LoginPage() {
       <div className="panel w-full max-w-sm p-8">
         <div className="flex flex-col items-center text-center mb-7">
           <Image
-            src="/logo.png"
+            src="/blackbox/logo.png"
             alt="blackbox"
             width={72}
             height={72}

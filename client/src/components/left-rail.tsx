@@ -26,10 +26,11 @@ export function LeftRail() {
   const pathname = usePathname();
   return (
     <aside className="relative flex flex-col items-center py-5 gap-2 h-full">
-      {/* logo */}
+      {/* logo — basePath baked in: next/image with unoptimized + static
+          export does not auto-prefix /blackbox to /public assets. */}
       <Link href="/" className="mb-3" title="blackbox">
         <Image
-          src="/logo.png"
+          src="/blackbox/logo.png"
           alt="blackbox"
           width={40}
           height={40}

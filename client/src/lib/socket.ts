@@ -13,8 +13,20 @@ const SOCKET_PATH = "/blackbox/ws/socket.io";
 
 export type Namespace = "/alerts" | "/checks" | "/logs" | "/system";
 
+/**
+ * Browsers reject `0.0.0.0` as a WebSocket destination — it's a bind-only
+ * address, valid for servers but not for clients. If the page is opened
+ * via that URL, fall back to `localhost` so the socket can still connect.
+ */
+function safeOrigin(): string {
+  if (typeof window === "undefined") return "";
+  const url = new URL(window.location.origin);
+  if (url.hostname === "0.0.0.0") url.hostname = "localhost";
+  return `${url.protocol}//${url.host}`;
+}
+
 export function connectNamespace(ns: Namespace): Socket {
-  return io(`${window.location.origin}${ns}`, {
+  return io(`${safeOrigin()}${ns}`, {
     path: SOCKET_PATH,
     withCredentials: true,
     transports: ["websocket", "polling"],
