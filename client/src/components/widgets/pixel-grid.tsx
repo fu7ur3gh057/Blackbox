@@ -59,16 +59,16 @@ export function PixelGrid() {
           >
             <defs>
               <linearGradient id="bar-cool" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%"  stopColor="#B5D17A" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#E8FF8F" stopOpacity="0.95" />
+                <stop offset="0%"  stopColor="#E0E0E5" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.95" />
               </linearGradient>
               <linearGradient id="bar-warn" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%"  stopColor="#FDE68A" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#FDE68A" stopOpacity="0.95" />
+                <stop offset="0%"  stopColor="#FBBF24" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#FBBF24" stopOpacity="0.95" />
               </linearGradient>
               <linearGradient id="bar-crit" x1="0" y1="1" x2="0" y2="0">
-                <stop offset="0%"  stopColor="#FCA5A5" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#FCA5A5" stopOpacity="1" />
+                <stop offset="0%"  stopColor="#EF4444" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#EF4444" stopOpacity="1" />
               </linearGradient>
             </defs>
 
@@ -84,7 +84,7 @@ export function PixelGrid() {
               />
             ))}
             {/* baseline */}
-            <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} stroke="rgba(181,209,122,0.18)" strokeWidth="0.6" />
+            <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} stroke="rgba(224,224,229,0.18)" strokeWidth="0.6" />
 
             {/* bars */}
             {buckets.map((b, i) => {
@@ -130,7 +130,7 @@ export function PixelGrid() {
                     />
                   </rect>
                   {isNow && !empty && (
-                    <circle cx={x + BAR / 2} cy={H - h - 1.5} r="1.4" fill="#E8FF8F">
+                    <circle cx={x + BAR / 2} cy={H - h - 1.5} r="1.4" fill="#FFFFFF">
                       <animate attributeName="opacity" values="1;0.3;1" dur="1.4s" repeatCount="indefinite" />
                     </circle>
                   )}
@@ -140,7 +140,7 @@ export function PixelGrid() {
 
             {/* scan beam — sweeps left → right */}
             <g>
-              <rect x="-2" y="0" width="2" height={H} fill="rgba(232,255,143,0.5)">
+              <rect x="-2" y="0" width="2" height={H} fill="rgba(255,255,255,0.5)">
                 <animate
                   attributeName="x"
                   values={`-2;${W};${W}`}

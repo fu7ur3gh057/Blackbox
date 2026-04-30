@@ -41,7 +41,7 @@ export const LogRow = memo(function LogRow({
     >
       {/* NEW left stripe */}
       {isNew && (
-        <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent-pale shadow-[0_0_8px_rgba(181,209,122,0.6)]" />
+        <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent-pale shadow-[0_0_8px_rgba(224,224,229,0.6)]" />
       )}
 
       {/* timestamp */}

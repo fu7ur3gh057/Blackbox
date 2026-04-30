@@ -31,14 +31,16 @@ export function Logo({
       aria-hidden
     >
       <defs>
+        {/* halo: white core with a tiny violet kiss at the edge — gives
+            the leak a slight neon shift instead of cold pure white */}
         <radialGradient id="logo-halo" cx="50%" cy="50%" r="50%">
-          <stop offset="0%"   stopColor="#D6F26B" stopOpacity="0.45" />
-          <stop offset="60%"  stopColor="#D6F26B" stopOpacity="0.10" />
-          <stop offset="100%" stopColor="#D6F26B" stopOpacity="0" />
+          <stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.45" />
+          <stop offset="60%"  stopColor="#C084FC" stopOpacity="0.10" />
+          <stop offset="100%" stopColor="#C084FC" stopOpacity="0" />
         </radialGradient>
         <linearGradient id="logo-edge" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stopColor="#E8FF8F" />
-          <stop offset="100%" stopColor="#B5D17A" />
+          <stop offset="0%"   stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#E0E0E5" />
         </linearGradient>
       </defs>
 
@@ -68,7 +70,7 @@ export function Logo({
       />
 
       {/* pulsing core dot */}
-      <circle cx="20" cy="20" r="3.6" fill="#D6F26B">
+      <circle cx="20" cy="20" r="3.6" fill="#FFFFFF">
         {animate && (
           <>
             <animate attributeName="r" values="3.2;4.2;3.2" dur="2.2s" repeatCount="indefinite" />
@@ -76,10 +78,10 @@ export function Logo({
           </>
         )}
       </circle>
-      <circle cx="20" cy="20" r="1.4" fill="#FFFFFF" />
+      <circle cx="20" cy="20" r="1.4" fill="#C084FC" />
 
       {/* escape rays — short tick marks at the 4 cardinal directions */}
-      <g stroke="#D6F26B" strokeWidth="1.4" strokeLinecap="round" opacity="0.85">
+      <g stroke="#FFFFFF" strokeWidth="1.4" strokeLinecap="round" opacity="0.85">
         <line x1="20" y1="1.5" x2="20" y2="4">
           {animate && <animate attributeName="opacity" values="0.4;1;0.4" dur="2.2s" repeatCount="indefinite" />}
         </line>

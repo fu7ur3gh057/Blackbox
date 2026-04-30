@@ -8,17 +8,31 @@ const config: Config = {
         // Page + surfaces
         canvas: {
           DEFAULT: "#050507",   // body
-          elev:    "#0A0E0B",   // panels
-          elev2:   "#0F1410",   // popovers / nested cards
-          line:    "rgba(34,255,102,0.06)",
+          elev:    "#0A0B0F",   // panels (slightly cooler than lime-tinted)
+          elev2:   "#0F1014",   // popovers / nested cards
+          line:    "rgba(255,255,255,0.06)",
         },
-        // Accents — chartreuse / lime, matched to logo edges
+        // Brand accent — was chartreuse, now monochrome white with a
+        // bit of warmth at the dim end. The neon palette below provides
+        // splashes of colour where differentiation matters.
         accent: {
-          pale:   "#B5D17A",   // washed-out lime — most widget details
-          green:  "#D6F26B",   // signal — only on true emphasis
-          bright: "#E8FF8F",   // hover / secondary
-          dim:    "#2A2D14",
-          glow:   "rgba(214, 242, 107, 0.40)",
+          pale:   "#E0E0E5",   // primary widget details
+          green:  "#F4F4F5",   // signal / emphasis  (name kept for compat)
+          bright: "#FFFFFF",   // hover / max emphasis
+          dim:    "#2A2A2D",
+          glow:   "rgba(255, 255, 255, 0.35)",
+        },
+        // Neon palette — used for source-hues in logs, port pills,
+        // splash corner glows. Saturated but not too loud on the dark
+        // canvas. Pick from these when something needs to be visually
+        // distinct from another item of the same type.
+        neon: {
+          violet:    "#C084FC",
+          pink:      "#F472B6",
+          burgundy:  "#9F1239",
+          brown:     "#B48A60",
+          turquoise: "#2DD4BF",
+          carrot:    "#F97316",
         },
         // Text
         ink: {
@@ -27,10 +41,13 @@ const config: Config = {
           dim:    "#7C7F84",
           mute:   "#4D5057",
         },
+        // Level colours stay semantically green/yellow/red but bumped
+        // toward the more saturated / "neon" end so they sit alongside
+        // the new palette without looking pastel-soft.
         level: {
-          ok:   "#D6F26B",
-          warn: "#FDE68A",
-          crit: "#FCA5A5",
+          ok:   "#84F4A3",
+          warn: "#FBBF24",
+          crit: "#EF4444",
         },
       },
       fontFamily: {
@@ -43,7 +60,7 @@ const config: Config = {
       },
       boxShadow: {
         canvas: "0 24px 60px -24px rgba(0, 0, 0, 0.85)",
-        chip:   "0 8px 24px -10px rgba(214, 242, 107, 0.55)",
+        chip:   "0 8px 24px -10px rgba(255, 255, 255, 0.40)",
         soft:   "0 2px 12px rgba(0,0,0,0.45)",
       },
     },

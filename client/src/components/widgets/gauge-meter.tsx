@@ -18,9 +18,9 @@ export function GaugeMeter() {
 
   const tone = pct >= 90 ? "crit" : pct >= 70 ? "warn" : "ok";
   const TONE: Record<string, { stroke: string; glow: string; label: string; pill: string }> = {
-    ok:   { stroke: "url(#g-ok)",   glow: "rgba(181,209,122,0.55)", label: "text-accent-pale",  pill: "bg-accent-pale/[0.12] text-accent-pale border-accent-pale/30" },
-    warn: { stroke: "url(#g-warn)", glow: "rgba(253,230,138,0.55)", label: "text-level-warn",   pill: "bg-level-warn/10 text-level-warn border-level-warn/30" },
-    crit: { stroke: "url(#g-crit)", glow: "rgba(252,165,165,0.6)",  label: "text-level-crit",   pill: "bg-level-crit/10 text-level-crit border-level-crit/30" },
+    ok:   { stroke: "url(#g-ok)",   glow: "rgba(224,224,229,0.55)", label: "text-accent-pale",  pill: "bg-accent-pale/[0.12] text-accent-pale border-accent-pale/30" },
+    warn: { stroke: "url(#g-warn)", glow: "rgba(251,191,36,0.55)", label: "text-level-warn",   pill: "bg-level-warn/10 text-level-warn border-level-warn/30" },
+    crit: { stroke: "url(#g-crit)", glow: "rgba(239,68,68,0.6)",  label: "text-level-crit",   pill: "bg-level-crit/10 text-level-crit border-level-crit/30" },
   };
 
   return (
@@ -35,13 +35,13 @@ export function GaugeMeter() {
           <svg viewBox="0 0 200 120" className="w-full">
             <defs>
               <linearGradient id="g-ok"   x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#B5D17A" /><stop offset="100%" stopColor="#E8FF8F" />
+                <stop offset="0%" stopColor="#E0E0E5" /><stop offset="100%" stopColor="#FFFFFF" />
               </linearGradient>
               <linearGradient id="g-warn" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#B5D17A" /><stop offset="100%" stopColor="#FDE68A" />
+                <stop offset="0%" stopColor="#E0E0E5" /><stop offset="100%" stopColor="#FBBF24" />
               </linearGradient>
               <linearGradient id="g-crit" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#FDE68A" /><stop offset="100%" stopColor="#FCA5A5" />
+                <stop offset="0%" stopColor="#FBBF24" /><stop offset="100%" stopColor="#EF4444" />
               </linearGradient>
               <radialGradient id="g-hub" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stopColor="#1A1D25" /><stop offset="100%" stopColor="#0A0B0F" />
@@ -80,7 +80,7 @@ export function GaugeMeter() {
             <g className="gauge-needle"
               style={{ transform: `rotate(${needleAngle}deg)`, transformOrigin: "100px 100px" }}>
               <path d="M 100 38 L 97 100 L 103 100 Z" fill="#F0E5CC" />
-              <circle cx="100" cy="100" r="6" fill="url(#g-hub)" stroke="#B5D17A" strokeWidth="1" />
+              <circle cx="100" cy="100" r="6" fill="url(#g-hub)" stroke="#E0E0E5" strokeWidth="1" />
               <circle cx="100" cy="100" r="2" fill="#FFFFFF" />
             </g>
           </svg>

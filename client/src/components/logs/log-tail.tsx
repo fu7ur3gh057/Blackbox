@@ -113,7 +113,7 @@ export function LogTail({
         onScroll={onScroll}
         className={cn(
           "relative flex-1 min-h-0 overflow-y-auto",
-          "bg-[radial-gradient(1200px_400px_at_20%_-20%,rgba(214,242,107,0.04),transparent_60%)]",
+          "bg-[radial-gradient(1200px_400px_at_20%_-20%,rgba(255,255,255,0.04),transparent_60%)]",
         )}
       >
         {lines.length === 0 ? (

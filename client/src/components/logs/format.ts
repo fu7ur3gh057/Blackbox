@@ -28,14 +28,15 @@ export const SEV_CLASS: Record<Severity, string> = {
   debug: "bg-white/[0.04] text-ink-mute ring-1 ring-white/10",
 };
 
-/** Deterministic per-source hue. Tailwind-arbitrary classes — JIT picks them up. */
+/** Deterministic per-source hue from the project's neon palette. The
+ * Tailwind-arbitrary class strings are picked up by JIT at build time. */
 const SOURCE_HUES = [
-  { fg: "text-accent-pale",  dot: "bg-accent-pale" },
-  { fg: "text-[#9BC0E5]",    dot: "bg-[#7BA9D9]"   }, // sky
-  { fg: "text-[#E5BB8C]",    dot: "bg-[#D9A77B]"   }, // amber
-  { fg: "text-[#D7AAEF]",    dot: "bg-[#C18FE0]"   }, // violet
-  { fg: "text-[#9BE5D2]",    dot: "bg-[#7BD9C5]"   }, // teal
-  { fg: "text-[#F0B0B0]",    dot: "bg-[#E89999]"   }, // pink
+  { fg: "text-neon-violet",    dot: "bg-neon-violet" },
+  { fg: "text-neon-pink",      dot: "bg-neon-pink" },
+  { fg: "text-neon-turquoise", dot: "bg-neon-turquoise" },
+  { fg: "text-neon-carrot",    dot: "bg-neon-carrot" },
+  { fg: "text-neon-brown",     dot: "bg-neon-brown" },
+  { fg: "text-neon-burgundy",  dot: "bg-neon-burgundy" },
 ];
 
 export function sourceHue(source: string): { fg: string; dot: string } {

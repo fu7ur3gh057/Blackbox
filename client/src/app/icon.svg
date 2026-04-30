@@ -1,20 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
   <defs>
     <radialGradient id="halo" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#D6F26B" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#D6F26B" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#C084FC" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#E8FF8F"/>
-      <stop offset="100%" stop-color="#B5D17A"/>
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E0E0E5"/>
     </linearGradient>
   </defs>
   <circle cx="20" cy="20" r="19" fill="url(#halo)"/>
   <rect x="6.5" y="6.5" width="27" height="27" rx="4" fill="none" stroke="url(#edge)" stroke-width="1.6" stroke-linejoin="round"/>
   <path d="M 8 11 L 8 8 L 11 8" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
-  <circle cx="20" cy="20" r="3.6" fill="#D6F26B"/>
-  <circle cx="20" cy="20" r="1.4" fill="#FFFFFF"/>
-  <g stroke="#D6F26B" stroke-width="1.4" stroke-linecap="round" opacity="0.85">
+  <circle cx="20" cy="20" r="3.6" fill="#FFFFFF"/>
+  <circle cx="20" cy="20" r="1.4" fill="#C084FC"/>
+  <g stroke="#FFFFFF" stroke-width="1.4" stroke-linecap="round" opacity="0.85">
     <line x1="20" y1="1.5" x2="20" y2="4"/>
     <line x1="38.5" y1="20" x2="36" y2="20"/>
     <line x1="20" y1="38.5" x2="20" y2="36"/>

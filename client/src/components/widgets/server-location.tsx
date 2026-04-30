@@ -112,24 +112,24 @@ export function ServerLocation() {
 
                 {/* radial glow for the pin */}
                 <radialGradient id="pin-glow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%"   stopColor="#D6F26B" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#D6F26B" stopOpacity={0} />
+                  <stop offset="0%"   stopColor="#FFFFFF" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="#FFFFFF" stopOpacity={0} />
                 </radialGradient>
               </defs>
 
               {/* faint outline of the world bounds */}
               <rect
                 x="0" y="0" width="200" height="100"
-                fill="rgba(181,209,122,0.025)"
-                stroke="rgba(181,209,122,0.10)"
+                fill="rgba(224,224,229,0.025)"
+                stroke="rgba(224,224,229,0.10)"
                 strokeWidth="0.3"
                 strokeDasharray="0.6 1.2"
                 rx="1.5"
               />
 
               {/* Equator + prime meridian */}
-              <line x1="0" y1="50" x2="200" y2="50" stroke="rgba(181,209,122,0.10)" strokeWidth="0.25" strokeDasharray="0.6 1.2" />
-              <line x1="100" y1="0" x2="100" y2="100" stroke="rgba(181,209,122,0.10)" strokeWidth="0.25" strokeDasharray="0.6 1.2" />
+              <line x1="0" y1="50" x2="200" y2="50" stroke="rgba(224,224,229,0.10)" strokeWidth="0.25" strokeDasharray="0.6 1.2" />
+              <line x1="100" y1="0" x2="100" y2="100" stroke="rgba(224,224,229,0.10)" strokeWidth="0.25" strokeDasharray="0.6 1.2" />
 
               {/* Dot grid clipped to land */}
               <g mask="url(#land-mask)">
@@ -139,7 +139,7 @@ export function ServerLocation() {
                     cx={d.cx}
                     cy={d.cy}
                     r={0.55}
-                    fill="#B5D17A"
+                    fill="#E0E0E5"
                     opacity={0.55}
                   />
                 ))}
@@ -147,12 +147,12 @@ export function ServerLocation() {
 
               {/* Server pin: glow + ring + core */}
               <circle cx={PIN_X} cy={PIN_Y} r={6} fill="url(#pin-glow)" />
-              <circle cx={PIN_X} cy={PIN_Y} r={3.2} fill="none" stroke="#D6F26B" strokeWidth="0.6">
+              <circle cx={PIN_X} cy={PIN_Y} r={3.2} fill="none" stroke="#FFFFFF" strokeWidth="0.6">
                 <animate attributeName="r" values="3;7;3" dur="2.4s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.85;0;0.85" dur="2.4s" repeatCount="indefinite" />
               </circle>
               <circle cx={PIN_X} cy={PIN_Y} r={1.4} fill="#FFFFFF" />
-              <circle cx={PIN_X} cy={PIN_Y} r={0.7} fill="#D6F26B" />
+              <circle cx={PIN_X} cy={PIN_Y} r={0.7} fill="#FFFFFF" />
             </svg>
 
             {/* Subtle scanline overlay just on the map */}
@@ -160,7 +160,7 @@ export function ServerLocation() {
               className="absolute inset-0 pointer-events-none rounded-lg"
               style={{
                 backgroundImage:
-                  "linear-gradient(to bottom, rgba(181,209,122,0.06) 0%, rgba(181,209,122,0.06) 1px, transparent 1px, transparent 4px)",
+                  "linear-gradient(to bottom, rgba(224,224,229,0.06) 0%, rgba(224,224,229,0.06) 1px, transparent 1px, transparent 4px)",
                 opacity: 0.6,
               }}
             />

@@ -5,9 +5,9 @@ import type { CheckSummary, Level } from "@/lib/types";
 import { useChecksSnapshot } from "@/lib/use-snapshot";
 
 const LEVEL: Record<Level, { fill: string; ring: string; glowColor: string }> = {
-  ok:   { fill: "#B5D17A", ring: "#B5D17A", glowColor: "rgba(181,209,122,0.55)" },
-  warn: { fill: "#FDE68A", ring: "#FDE68A", glowColor: "rgba(253,230,138,0.55)" },
-  crit: { fill: "#FCA5A5", ring: "#FCA5A5", glowColor: "rgba(252,165,165,0.65)" },
+  ok:   { fill: "#E0E0E5", ring: "#E0E0E5", glowColor: "rgba(224,224,229,0.55)" },
+  warn: { fill: "#FBBF24", ring: "#FBBF24", glowColor: "rgba(251,191,36,0.55)" },
+  crit: { fill: "#EF4444", ring: "#EF4444", glowColor: "rgba(239,68,68,0.65)" },
 };
 
 const DUMMY: CheckSummary[] = [
@@ -55,21 +55,21 @@ export function NodeWeb() {
           <svg className="absolute inset-0 w-full h-full" viewBox={`0 0 ${VIEW} ${VIEW}`}>
             <defs>
               <radialGradient id="orbit-bg" cx="50%" cy="50%" r="50%">
-                <stop offset="0%"   stopColor="rgba(181,209,122,0.12)" />
-                <stop offset="60%"  stopColor="rgba(181,209,122,0.04)" />
+                <stop offset="0%"   stopColor="rgba(224,224,229,0.12)" />
+                <stop offset="60%"  stopColor="rgba(224,224,229,0.04)" />
                 <stop offset="100%" stopColor="transparent" />
               </radialGradient>
               <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"   stopColor="rgba(181,209,122,0.45)" />
-                <stop offset="100%" stopColor="rgba(181,209,122,0.05)" />
+                <stop offset="0%"   stopColor="rgba(224,224,229,0.45)" />
+                <stop offset="100%" stopColor="rgba(224,224,229,0.05)" />
               </linearGradient>
               <radialGradient id="core-glow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%"   stopColor="rgba(214,242,107,0.55)" />
-                <stop offset="100%" stopColor="rgba(214,242,107,0)"    />
+                <stop offset="0%"   stopColor="rgba(255,255,255,0.55)" />
+                <stop offset="100%" stopColor="rgba(255,255,255,0)"    />
               </radialGradient>
               <linearGradient id="core-fill" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%"   stopColor="#E8FF8F" />
-                <stop offset="100%" stopColor="#B5D17A" />
+                <stop offset="0%"   stopColor="#FFFFFF" />
+                <stop offset="100%" stopColor="#E0E0E5" />
               </linearGradient>
             </defs>
 
@@ -80,7 +80,7 @@ export function NodeWeb() {
             <g transform-origin={`${CENTER} ${CENTER}`}>
               <circle
                 cx={CENTER} cy={CENTER} r={ORBIT_R}
-                fill="none" stroke="rgba(181,209,122,0.18)"
+                fill="none" stroke="rgba(224,224,229,0.18)"
                 strokeWidth="0.6" strokeDasharray="1.5 4"
               >
                 <animateTransform
@@ -117,7 +117,7 @@ export function NodeWeb() {
                     strokeLinecap="round"
                   />
                   {/* packet — travels centre → node, loops */}
-                  <circle r="1.4" fill="#E8FF8F" opacity="0.9">
+                  <circle r="1.4" fill="#FFFFFF" opacity="0.9">
                     <animateMotion
                       dur={`${dur}s`}
                       begin={`-${delay}s`}
@@ -203,7 +203,7 @@ export function NodeWeb() {
               {/* breathing halo ring */}
               <circle
                 cx={CENTER} cy={CENTER} r="11"
-                fill="none" stroke="rgba(214,242,107,0.55)" strokeWidth="0.8"
+                fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.8"
               >
                 <animate attributeName="r"       values="10;18"   dur="2.4s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.55;0" dur="2.4s" repeatCount="indefinite" />
