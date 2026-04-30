@@ -23,7 +23,7 @@ const METRIC_OPTIONS: { key: MetricKey; label: string }[] = [
   { key: "both",   label: "Both" },
 ];
 
-const CPU_COLOR = "#8FBF98";
+const CPU_COLOR = "#B5D17A";
 const MEM_COLOR = "#FFFFFF";
 
 export function Statistics() {
@@ -161,10 +161,10 @@ export function Statistics() {
                 width={36}
               />
               <Tooltip
-                cursor={{ stroke: "rgba(143,191,152,0.30)", strokeDasharray: "3 3" }}
+                cursor={{ stroke: "rgba(181,209,122,0.30)", strokeDasharray: "3 3" }}
                 contentStyle={{
                   background: "rgba(20,22,30,0.95)",
-                  border: "1px solid rgba(143,191,152,0.20)",
+                  border: "1px solid rgba(181,209,122,0.20)",
                   borderRadius: 12, fontSize: 12,
                 }}
                 labelFormatter={(t) => new Date(t as number).toLocaleString()}

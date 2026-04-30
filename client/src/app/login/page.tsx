@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api";
 import { auth } from "@/lib/auth";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -35,11 +36,21 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="panel w-full max-w-sm p-8">
-        <div className="flex items-baseline gap-3 mb-8">
-          <span className="text-2xl font-semibold tracking-tight text-ink-strong">
-            black<span className="text-accent-pale">box</span>
-          </span>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-ink-mute">monitoring</span>
+        <div className="flex flex-col items-center text-center mb-7">
+          <Image
+            src="/logo.png"
+            alt="blackbox"
+            width={72}
+            height={72}
+            className="h-[72px] w-[72px] drop-shadow-[0_0_22px_rgba(214,242,107,0.45)]"
+            priority
+          />
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-ink-strong font-mono">
+            blackbox
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-ink-mute mt-1">
+            monitoring
+          </div>
         </div>
 
         <h1 className="text-[20px] font-semibold tracking-tight text-ink-strong">Welcome back</h1>

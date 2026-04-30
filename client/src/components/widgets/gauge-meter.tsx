@@ -27,7 +27,7 @@ export function GaugeMeter() {
   const tone =
     pct >= 90 ? "crit" : pct >= 70 ? "warn" : "ok";
   const TONE: Record<string, { stroke: string; glow: string; label: string }> = {
-    ok:   { stroke: "url(#gauge-ok)",   glow: "rgba(143,191,152,0.55)", label: "text-accent-pale" },
+    ok:   { stroke: "url(#gauge-ok)",   glow: "rgba(181,209,122,0.55)", label: "text-accent-pale" },
     warn: { stroke: "url(#gauge-warn)", glow: "rgba(251,191,36,0.55)",  label: "text-level-warn" },
     crit: { stroke: "url(#gauge-crit)", glow: "rgba(252,165,165,0.6)",  label: "text-level-crit" },
   };
@@ -44,11 +44,11 @@ export function GaugeMeter() {
         <svg viewBox="0 0 200 130" className="w-full max-w-[260px]">
           <defs>
             <linearGradient id="gauge-ok" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#8FBF98" />
-              <stop offset="100%" stopColor="#8FBF98" />
+              <stop offset="0%" stopColor="#B5D17A" />
+              <stop offset="100%" stopColor="#B5D17A" />
             </linearGradient>
             <linearGradient id="gauge-warn" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#8FBF98" />
+              <stop offset="0%" stopColor="#B5D17A" />
               <stop offset="100%" stopColor="#FDE68A" />
             </linearGradient>
             <linearGradient id="gauge-crit" x1="0" y1="0" x2="1" y2="0">
@@ -104,11 +104,11 @@ export function GaugeMeter() {
             <defs>
               <linearGradient id="needle-grad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#F0E5CC" />
-                <stop offset="100%" stopColor="#8FBF98" />
+                <stop offset="100%" stopColor="#B5D17A" />
               </linearGradient>
             </defs>
             <path d="M 100 35 L 96 100 L 104 100 Z" fill="url(#needle-grad)" />
-            <circle cx="100" cy="100" r="8" fill="url(#gauge-hub)" stroke="#8FBF98" strokeWidth="1.5" />
+            <circle cx="100" cy="100" r="8" fill="url(#gauge-hub)" stroke="#B5D17A" strokeWidth="1.5" />
             <circle cx="100" cy="100" r="2.5" fill="#F0E5CC" />
           </g>
         </svg>

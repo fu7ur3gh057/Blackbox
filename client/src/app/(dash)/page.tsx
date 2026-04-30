@@ -11,8 +11,9 @@ import { WatchCards } from "@/components/widgets/watch-cards";
 
 /**
  * Each widget is wrapped in <Reveal delay /> so the dashboard "boots up"
- * staggered, terminal-style — every panel un-blurs in turn. Delays span
- * ~2.5s to give the boot sequence weight without dragging.
+ * staggered, terminal-style. Delays span ~3.5s — the boot sequence
+ * deliberately reads like a system loading screen, every panel
+ * un-blurs in turn instead of all popping at once.
  */
 export default function Dashboard() {
   return (
@@ -20,19 +21,19 @@ export default function Dashboard() {
       <Reveal delay={0}><Statistics /></Reveal>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <Reveal delay={350}><RecentChecks /></Reveal>
-        <Reveal delay={500}><HealthyList /></Reveal>
+        <Reveal delay={500}><RecentChecks /></Reveal>
+        <Reveal delay={750}><HealthyList /></Reveal>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        <Reveal delay={700}><GaugeMeter /></Reveal>
-        <Reveal delay={850}><PixelGrid /></Reveal>
-        <Reveal delay={1000}><Heartbeat /></Reveal>
-        <Reveal delay={1150}><NodeWeb /></Reveal>
+        <Reveal delay={1000}><GaugeMeter /></Reveal>
+        <Reveal delay={1250}><PixelGrid /></Reveal>
+        <Reveal delay={1500}><Heartbeat /></Reveal>
+        <Reveal delay={1750}><NodeWeb /></Reveal>
       </div>
 
-      <Reveal delay={1350}><ServerLocation /></Reveal>
-      <Reveal delay={1550}><WatchCards /></Reveal>
+      <Reveal delay={2050}><WatchCards /></Reveal>
+      <Reveal delay={2350}><ServerLocation /></Reveal>
     </div>
   );
 }

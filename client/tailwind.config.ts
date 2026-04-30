@@ -12,13 +12,13 @@ const config: Config = {
           elev2:   "#0F1410",   // popovers / nested cards
           line:    "rgba(34,255,102,0.06)",
         },
-        // Accents — pale green dominant, bright reserved for live signal
+        // Accents — chartreuse / lime, matched to logo edges
         accent: {
-          pale:   "#8FBF98",   // default green tone — most widget details
-          green:  "#22FF66",   // signal — only on true emphasis
-          bright: "#7CFFA0",   // hover / secondary
-          dim:    "#1A2820",
-          glow:   "rgba(143, 191, 152, 0.40)",
+          pale:   "#B5D17A",   // washed-out lime — most widget details
+          green:  "#D6F26B",   // signal — only on true emphasis
+          bright: "#E8FF8F",   // hover / secondary
+          dim:    "#2A2D14",
+          glow:   "rgba(214, 242, 107, 0.40)",
         },
         // Text
         ink: {
@@ -28,7 +28,7 @@ const config: Config = {
           mute:   "#4D5057",
         },
         level: {
-          ok:   "#22FF66",
+          ok:   "#D6F26B",
           warn: "#FDE68A",
           crit: "#FCA5A5",
         },
@@ -43,7 +43,7 @@ const config: Config = {
       },
       boxShadow: {
         canvas: "0 24px 60px -24px rgba(0, 0, 0, 0.85)",
-        chip:   "0 8px 24px -10px rgba(34, 255, 102, 0.5)",
+        chip:   "0 8px 24px -10px rgba(214, 242, 107, 0.55)",
         soft:   "0 2px 12px rgba(0,0,0,0.45)",
       },
     },

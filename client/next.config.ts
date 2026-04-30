@@ -15,6 +15,8 @@ const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8765";
 const config: NextConfig = {
   basePath: "/blackbox",
   trailingSlash: true,
+  // Static export can't run the image optimiser — pass-through assets.
+  images: { unoptimized: true },
   ...(isStatic ? { output: "export" } : {}),
   // Rewrites are dev-only; in static export Next strips them and warns.
   // Skip declaring the function entirely when building static.

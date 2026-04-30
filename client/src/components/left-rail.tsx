@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -25,11 +26,16 @@ export function LeftRail() {
   const pathname = usePathname();
   return (
     <aside className="relative flex flex-col items-center py-5 gap-2 h-full">
-      {/* logo — terminal prompt, white on dark with pale-green ring */}
+      {/* logo */}
       <Link href="/" className="mb-3" title="blackbox">
-        <div className="h-9 w-9 rounded-2xl bg-canvas-elev2 border border-accent-pale/40 flex items-center justify-center text-ink-strong font-bold font-mono text-[18px]">
-          &gt;
-        </div>
+        <Image
+          src="/logo.png"
+          alt="blackbox"
+          width={40}
+          height={40}
+          className="h-10 w-10 drop-shadow-[0_0_12px_rgba(214,242,107,0.45)]"
+          priority
+        />
       </Link>
 
       {NAV.map(({ href, Icon, label }) => {

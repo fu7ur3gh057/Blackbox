@@ -93,6 +93,6 @@ function pickClass(count: number, hasCrit: boolean): string {
   if (count === 0) return "bg-white/[0.035] border border-white/[0.04]";
   if (hasCrit) return "bg-level-crit/70 shadow-[0_0_12px_rgba(252,165,165,0.45)]";
   if (count >= 6) return "bg-accent-bright/70 shadow-[0_0_12px_rgba(255,255,255,0.4)]";
-  if (count >= 3) return "bg-accent-green/60 shadow-[0_0_10px_rgba(143,191,152,0.4)]";
+  if (count >= 3) return "bg-accent-green/60 shadow-[0_0_10px_rgba(181,209,122,0.4)]";
   return "bg-accent-green/30";
 }

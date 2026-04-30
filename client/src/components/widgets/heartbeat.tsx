@@ -81,13 +81,13 @@ export function Heartbeat() {
           <svg viewBox="0 0 800 100" className="w-full h-full" preserveAspectRatio="none">
             <defs>
               <linearGradient id="ecg-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"  stopColor="#8FBF98" stopOpacity="0.4" />
-                <stop offset="50%" stopColor="#8FBF98" stopOpacity="1" />
+                <stop offset="0%"  stopColor="#B5D17A" stopOpacity="0.4" />
+                <stop offset="50%" stopColor="#B5D17A" stopOpacity="1" />
                 <stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
               </linearGradient>
               <linearGradient id="ecg-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="#8FBF98" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="#8FBF98" stopOpacity="0" />
+                <stop offset="0%"   stopColor="#B5D17A" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#B5D17A" stopOpacity="0" />
               </linearGradient>
             </defs>
 
