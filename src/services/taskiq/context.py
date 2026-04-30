@@ -1,7 +1,7 @@
 """Process-wide runtime context, attached to broker.state.
 
 Tasks inject this via `TaskiqDepends(get_app_context)`. State that needs
-to survive restarts now lives in SQLite (`services.db.models`); this
+to survive restarts now lives in SQLite (`db.models`); this
 dataclass holds the still-volatile pieces — built handlers, notifier
 instances, report sections — that get rebuilt on every boot from config.
 """
@@ -9,7 +9,7 @@ instances, report sections — that get rebuilt on every boot from config.
 from dataclasses import dataclass, field
 
 from core.checks import Check
-from core.config import Config
+from config import Config
 from core.notifiers.base import Notifier
 from core.report.sections.base import Section
 

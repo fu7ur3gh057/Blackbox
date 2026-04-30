@@ -2,7 +2,7 @@
 
 import asyncio
 
-from core.config import Config
+from config import Config
 from services.taskiq.context import AppContext
 from services.taskiq.scheduler import _periodic, run_scheduler
 

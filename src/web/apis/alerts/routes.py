@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlmodel import desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from services.db.deps import get_session
-from services.db.models import AlertEvent
+from db.deps import get_session
+from db.models import AlertEvent
 
 router = APIRouter(tags=["alerts"])
 

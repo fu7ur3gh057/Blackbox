@@ -2,15 +2,15 @@
 
 Each test that touches the broker also gets a fresh on-disk SQLite (under
 the test's tmp_path) wired into broker.state. Tasks resolve sessions
-through services.db.deps.get_session, which reads the same broker.state,
+through db.deps.get_session, which reads the same broker.state,
 so production code path stays unchanged in tests.
 """
 
 import pytest
 import pytest_asyncio
 
-from core.config import Config
-from services.db.lifetime import init_db, shutdown_db
+from config import Config
+from db.lifetime import init_db, shutdown_db
 from services.taskiq.broker import broker as global_broker
 from services.taskiq.context import AppContext
 

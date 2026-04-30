@@ -8,8 +8,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from taskiq import TaskiqDepends
 
 from core.notifiers import Alert
-from services.db.deps import get_session
-from services.db.models import AlertEvent
+from db.deps import get_session
+from db.models import AlertEvent
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 from services.taskiq.deps import get_app_context

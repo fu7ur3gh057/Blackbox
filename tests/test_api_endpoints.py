@@ -9,9 +9,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from core.checks.base import Result
-from core.config import CheckConfig, Config, NotifierConfig
+from config import CheckConfig, Config, NotifierConfig
 from core.notifiers.base import Notifier as NotifierProto  # noqa: F401
-from services.db.models import AlertEvent, CheckResult, CheckStateEntry, LogSignatureEntry
+from db.models import AlertEvent, CheckResult, CheckStateEntry, LogSignatureEntry
 from services.taskiq.context import AppContext
 from web.application import get_app
 from web.auth.passwords import hash_password

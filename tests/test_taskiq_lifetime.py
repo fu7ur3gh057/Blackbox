@@ -3,7 +3,7 @@ report metadata, attach it to broker.state, and bring up the SQLite DB."""
 
 from pathlib import Path
 
-from core.config import CheckConfig, Config, NotifierConfig
+from config import CheckConfig, Config, NotifierConfig
 from services.taskiq.broker import broker as global_broker
 from services.taskiq.lifetime import init_broker, shutdown_broker
 

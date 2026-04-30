@@ -6,10 +6,10 @@ through the same session_maker."""
 from sqlmodel import select
 
 from core.checks.base import Result
-from core.config import Config
+from config import Config
 from core.notifiers import Alert
 from core.report.sections.base import Section, SectionResult
-from services.db.models import AlertEvent, CheckResult, CheckStateEntry
+from db.models import AlertEvent, CheckResult, CheckStateEntry
 from services.taskiq.context import AppContext
 
 

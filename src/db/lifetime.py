@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from services.db import models  # noqa: F401  — registers tables in metadata
+from db import models  # noqa: F401  — registers tables in metadata
 from services.taskiq.broker import broker
 
 log = logging.getLogger(__name__)

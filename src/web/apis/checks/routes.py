@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import desc, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from services.db.deps import get_session
-from services.db.models import CheckResult, CheckStateEntry
+from db.deps import get_session
+from db.models import CheckResult, CheckStateEntry
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 from services.taskiq.deps import get_app_context

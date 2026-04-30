@@ -71,7 +71,7 @@ class LogProcessor:
         await asyncio.gather(*tasks)
 
     async def _hydrate_from_db(self) -> None:
-        from services.db.models import LogSignatureEntry
+        from db.models import LogSignatureEntry
         from services.taskiq.broker import broker
 
         session_maker = broker.state.data.get("db_session_maker")
@@ -140,7 +140,7 @@ class LogProcessor:
     async def _persist_sig(
         self, sig: str, source: str, sample: str, ts: float, total: int, first: bool,
     ) -> None:
-        from services.db.models import LogSignatureEntry
+        from db.models import LogSignatureEntry
         from services.taskiq.broker import broker
 
         session_maker = broker.state.data.get("db_session_maker")

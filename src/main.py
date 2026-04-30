@@ -17,7 +17,7 @@ import signal
 import sys
 from pathlib import Path
 
-from core.config import Config, load_config
+from config import Config, load_config
 from core.logs import build_log_processor
 from services.taskiq.broker import broker
 from services.taskiq.lifetime import init_broker, shutdown_broker

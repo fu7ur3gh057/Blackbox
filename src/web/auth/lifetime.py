@@ -8,7 +8,7 @@ the JWT secret never ends up loaded for a CLI-only deployment.
 import logging
 import secrets
 
-from core.config import Config
+from config import Config
 from services.taskiq.broker import broker
 
 log = logging.getLogger(__name__)

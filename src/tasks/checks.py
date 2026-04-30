@@ -2,7 +2,7 @@
 
 Persists every result to `check_results`, advances `check_state`, and on
 a level transition fires `send_alert.kiq`. Both worker and web see the
-same DB through services.db.
+same DB through src/db.
 """
 
 import logging
@@ -14,8 +14,8 @@ from taskiq import TaskiqDepends
 from core.checks import Result
 from core.notifiers import Alert
 from core.state import decide_transition
-from services.db.deps import get_session
-from services.db.models import CheckResult, CheckStateEntry
+from db.deps import get_session
+from db.models import CheckResult, CheckStateEntry
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 from services.taskiq.deps import get_app_context

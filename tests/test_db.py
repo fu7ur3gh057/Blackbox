@@ -5,8 +5,8 @@ from pathlib import Path
 
 from sqlmodel import select
 
-from services.db.lifetime import init_db, shutdown_db
-from services.db.models import (
+from db.lifetime import init_db, shutdown_db
+from db.models import (
     AlertEvent,
     CheckResult,
     CheckStateEntry,

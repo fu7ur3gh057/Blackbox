@@ -11,7 +11,7 @@ from sqlmodel import select
 
 from core.logs.processor import LogProcessor, _signature
 from core.logs.storage import JsonlStorage
-from services.db.models import LogSignatureEntry
+from db.models import LogSignatureEntry
 
 
 class FakeSource:

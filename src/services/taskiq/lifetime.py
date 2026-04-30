@@ -10,10 +10,10 @@ import logging
 from pathlib import Path
 
 from core.checks import build_check
-from core.config import Config
+from config import Config
 from core.notifiers import build_notifier
 from core.report import build_report_context
-from services.db.lifetime import init_db, shutdown_db
+from db.lifetime import init_db, shutdown_db
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 
