@@ -1,4 +1,4 @@
-from monitoring.config import NotifierConfig
+from core.config import NotifierConfig
 from .base import Alert, Notifier
 from .telegram import TelegramNotifier
 

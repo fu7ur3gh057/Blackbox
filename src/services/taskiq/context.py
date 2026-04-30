@@ -8,11 +8,11 @@ push state into Redis or rebuild it in each worker on startup.
 
 from dataclasses import dataclass, field
 
-from monitoring.checks import Check
-from monitoring.config import Config
-from monitoring.notifiers.base import Notifier
-from monitoring.report.sections.base import Section
-from monitoring.state import StateTracker
+from core.checks import Check
+from core.config import Config
+from core.notifiers.base import Notifier
+from core.report.sections.base import Section
+from core.state import StateTracker
 
 
 @dataclass

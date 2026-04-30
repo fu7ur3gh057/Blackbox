@@ -8,10 +8,10 @@ startup is harmless.
 
 import logging
 
-from monitoring.checks import build_check
-from monitoring.config import Config
-from monitoring.notifiers import build_notifier
-from monitoring.report import build_report_context
+from core.checks import build_check
+from core.config import Config
+from core.notifiers import build_notifier
+from core.report import build_report_context
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 

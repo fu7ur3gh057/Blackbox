@@ -1,4 +1,4 @@
-from monitoring.config import CheckConfig
+from core.config import CheckConfig
 from .base import Check, Result
 from .cpu import CpuCheck
 from .disk import DiskCheck

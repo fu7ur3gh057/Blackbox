@@ -2,7 +2,7 @@ import logging
 
 import httpx
 
-from monitoring.i18n import fmt_now
+from core.i18n import fmt_now
 from .base import Alert
 
 log = logging.getLogger(__name__)

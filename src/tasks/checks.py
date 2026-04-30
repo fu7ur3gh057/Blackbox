@@ -8,8 +8,8 @@ to dispatch through every configured notifier.
 
 import logging
 
-from monitoring.checks import Result
-from monitoring.notifiers import Alert
+from core.checks import Result
+from core.notifiers import Alert
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 from services.taskiq.deps import get_app_context

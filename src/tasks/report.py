@@ -3,8 +3,8 @@
 import asyncio
 import logging
 
-from monitoring.report.builder import assemble
-from monitoring.report.sections.base import SectionResult
+from core.report.builder import assemble
+from core.report.sections.base import SectionResult
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 from services.taskiq.deps import get_app_context

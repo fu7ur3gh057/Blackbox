@@ -2,7 +2,7 @@
 
 import logging
 
-from monitoring.notifiers import Alert
+from core.notifiers import Alert
 from services.taskiq.broker import broker
 from services.taskiq.context import AppContext
 from services.taskiq.deps import get_app_context
