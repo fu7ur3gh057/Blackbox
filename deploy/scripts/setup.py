@@ -104,7 +104,6 @@ LOCALES: dict[str, dict[str, str]] = {
         "step_remove_unit": "removing unit file",
         "service_removed": "service stopped and removed",
         "starting_dev": "starting BlackBox (Ctrl+C to stop)",
-        "service_summary": "service will run as [cyan]{user}:{group}[/cyan] from [cyan]{root}[/cyan]",
         "confirm_install": "proceed with install?",
         "service_done": "service installed and started",
         "logs_hint": "logs:    make logs",
@@ -184,7 +183,6 @@ LOCALES: dict[str, dict[str, str]] = {
         "step_remove_unit": "удаляю unit-файл",
         "service_removed": "сервис остановлен и удалён",
         "starting_dev": "запускаю BlackBox (Ctrl+C чтобы остановить)",
-        "service_summary": "сервис будет запущен под [cyan]{user}:{group}[/cyan] из [cyan]{root}[/cyan]",
         "confirm_install": "ставим?",
         "service_done": "сервис установлен и запущен",
         "logs_hint": "логи:    make logs",
@@ -821,10 +819,7 @@ def install_systemd() -> int:
     venv_py = ensure_venv()
     section(t("section_service"))
 
-    user = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
-    group = subprocess.check_output(["id", "-gn", user], text=True).strip()
-
-    console.print(f"  [dim]user:[/dim] [bold cyan]{user}:{group}[/bold cyan]")
+    console.print(f"  [dim]user:[/dim] [bold cyan]root[/bold cyan]")
     console.print(f"  [dim]path:[/dim] [cyan]{PROJECT_ROOT}[/cyan]")
     console.print(f"  [dim]unit:[/dim] [cyan]{UNIT_PATH}[/cyan]")
 
@@ -835,7 +830,7 @@ def install_systemd() -> int:
         console.print("[red]sudo failed[/red]")
         return 1
 
-    unit = build_unit(user=user, group=group, venv_py=venv_py)
+    unit = build_unit(venv_py=venv_py)
 
     def write_unit():
         subprocess.run(
@@ -908,12 +903,17 @@ def uninstall_systemd() -> int:
     return 0
 
 
-def build_unit(*, user: str, group: str, venv_py: Path) -> str:
-    # Hardening flags (ProtectSystem/ProtectHome/PrivateTmp/ReadWritePaths) were
-    # dropped intentionally: they create a private mount namespace, which breaks
-    # control-panel setups where /var/www/<user>/ is a bind mount or has
-    # restricted parent directories that get hidden inside the namespace
-    # (docker compose then fails to stat .env files even as root).
+def build_unit(*, venv_py: Path) -> str:
+    # Runs as root by default. Control-panel setups (FastPanel/ISPmanager/etc.)
+    # put per-site configs under /var/www/<panel-user>/ with directory ACLs that
+    # deny access to anyone outside the owning user — even members of the panel's
+    # admin group fall into the explicit `---` group bits and lose traversal.
+    # Running as root is the only way `docker compose` can reliably stat each
+    # project's .env without per-host group surgery.
+    #
+    # Hardening flags (ProtectSystem/ProtectHome/PrivateTmp/ReadWritePaths) are
+    # also omitted: they create a private mount namespace which hides those same
+    # bind-mounted /var/www/<user>/ paths even from root.
     return f"""[Unit]
 Description=BlackBox monitoring daemon
 After=network-online.target
@@ -921,8 +921,6 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User={user}
-Group={group}
 WorkingDirectory={PROJECT_ROOT}
 ExecStart={venv_py} -m src.main {CONFIG_FILE}
 Restart=on-failure

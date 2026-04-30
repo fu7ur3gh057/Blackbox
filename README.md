@@ -21,8 +21,9 @@ No agents, no databases, no service mesh.
 - **Interactive setup wizard** — auto-detects mounted disks, network interfaces,
   running Docker Compose projects with their containers, and active systemd
   services. Pick what to monitor via terminal checkboxes.
-- **systemd-ready** — install as a service in one command, runs as your user
-  with sandboxing flags by default.
+- **systemd-ready** — install as a service in one command. Runs as root so
+  `docker compose` can read `.env` files in control-panel layouts (FastPanel,
+  ISPmanager) where per-site directories have restrictive group ACLs.
 
 ## Requirements
 
