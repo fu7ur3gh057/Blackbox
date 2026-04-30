@@ -17,20 +17,9 @@ _DEFAULT_EXPIRY_SECONDS = 7 * 24 * 3600  # 7 days
 
 
 def init_auth(config: Config) -> None:
+    """Wire JWT secret + expiry onto broker.state. User accounts live in
+    the DB now (the `users` table) — no longer pulled from the YAML."""
     web = config.web or {}
-
-    user_cfg = web.get("user") or {}
-    if user_cfg.get("username") and user_cfg.get("password_hash"):
-        broker.state.web_user = {
-            "username": user_cfg["username"],
-            "password_hash": user_cfg["password_hash"],
-        }
-    else:
-        broker.state.web_user = None
-        log.warning(
-            "web: no admin user in config.web.user — login disabled. "
-            "Re-run `make setup` to create one."
-        )
 
     jwt_cfg = web.get("jwt") or {}
     secret = jwt_cfg.get("secret")

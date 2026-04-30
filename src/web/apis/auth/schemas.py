@@ -15,4 +15,5 @@ class TokenResponse(BaseModel):
 
 class MeResponse(BaseModel):
     username: str
+    role: str = "admin"
     expires_at: int  # unix timestamp

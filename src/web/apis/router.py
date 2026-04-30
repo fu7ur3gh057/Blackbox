@@ -16,6 +16,7 @@ from web.apis.reports.routes import router as reports_router
 from web.apis.status.routes import router as status_router
 from web.apis.system.routes import router as system_router
 from web.apis.terminal.routes import router as terminal_router
+from web.apis.users.routes import router as users_router
 
 api_router: APIRouter = APIRouter()
 
@@ -34,5 +35,6 @@ protected.include_router(logs_router, prefix="/logs")
 protected.include_router(notifiers_router, prefix="/notifiers")
 protected.include_router(config_router, prefix="/config")
 protected.include_router(terminal_router, prefix="/terminal")
+protected.include_router(users_router, prefix="/users")
 
 api_router.include_router(protected)

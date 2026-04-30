@@ -497,7 +497,12 @@ def run_wizard() -> None:
     section(t("section_web"))
     web_cfg = configure_web()
 
-    yaml_text = build_yaml(
+    # Boot YAML is now minimal — db.path + web boot only. Everything
+    # else (notifiers, checks, report, logs, terminal, admin user) goes
+    # straight into the SQLite DB so the wizard isn't fighting the file
+    # for who's the source of truth.
+    yaml_text = build_boot_yaml(web_cfg=web_cfg)
+    runtime_settings = build_runtime_settings(
         bot_token=bot_token, chat_id=chat_id, proxy=proxy_url,
         hostname=hostname,
         check_interval=check_int,
@@ -515,6 +520,18 @@ def run_wizard() -> None:
         backup = CONFIG_FILE.with_suffix(".yaml.bak")
         step(t("step_backup", name=backup.name), lambda: shutil.copy(CONFIG_FILE, backup))
     step(t("step_write"), lambda: CONFIG_FILE.write_text(yaml_text))
+
+    # Persist runtime settings + admin user to the DB. The daemon will
+    # read these on next start (or already, if it was restarted between
+    # wizard runs).
+    db_path = PROJECT_ROOT / "data" / "blackbox.sqlite"
+    user_row: dict | None = None
+    if web_cfg and web_cfg.get("enabled"):
+        u = web_cfg.get("user") or {}
+        if u.get("username") and u.get("password_hash"):
+            user_row = {"username": u["username"], "password_hash": u["password_hash"]}
+    step("writing settings + admin to DB",
+         lambda: persist_runtime_to_db(db_path, runtime_settings, user_row))
 
     # If web was enabled, build the bundle and bounce the service in place.
     # Both are no-ops if the prerequisites aren't met (Node missing, unit
@@ -1392,7 +1409,223 @@ def _render_logs_yaml(logs_cfg: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def build_runtime_settings(
+    *,
+    bot_token: str,
+    chat_id: str,
+    proxy: str = "",
+    hostname: str,
+    check_interval: int = 60,
+    report_interval: int,
+    warn_pct: int,
+    crit_pct: int,
+    disks: list[str],
+    docker_blocks: list[dict],
+    net_cfg: dict | bool = True,
+    systemd_units: list[str] | None = None,
+    logs_cfg: dict | None = None,
+    web_cfg: dict | None = None,
+    notifier_lang: str = "en",
+) -> dict:
+    """Build the runtime-settings dict that gets written to the
+    Settings DB row (id=1). Mirrors what `config.notifiers` /
+    `config.checks` / `config.report` / `config.logs` / `web.terminal`
+    used to look like in YAML — same shape, just no longer in the file.
+    """
+    systemd_units = systemd_units or []
+
+    notifier: dict = {
+        "type": "telegram",
+        "bot_token": bot_token,
+        "chat_id": str(chat_id),
+        "lang": notifier_lang,
+    }
+    if proxy:
+        notifier["proxy"] = proxy
+
+    checks: list[dict] = [
+        {"type": "cpu",    "name": "cpu",    "interval": check_interval,
+         "warn_pct": warn_pct, "crit_pct": crit_pct},
+        {"type": "memory", "name": "memory", "interval": check_interval,
+         "warn_pct": warn_pct, "crit_pct": crit_pct},
+    ]
+    for d in disks:
+        checks.append({
+            "type": "disk", "name": f"disk-{_slug(d)}", "interval": check_interval,
+            "path": d, "warn_pct": warn_pct, "crit_pct": crit_pct,
+        })
+    for unit in systemd_units:
+        unit_slug = unit.replace(".service", "").replace(".", "-")
+        checks.append({
+            "type": "systemd", "name": f"systemd-{unit_slug}",
+            "interval": check_interval, "unit": unit,
+        })
+
+    report: dict = {
+        "interval": report_interval,
+        "hostname": hostname,
+        "notifier": "telegram",
+        "host": {
+            "disks": list(disks) or ["/"],
+            "warn_pct": warn_pct,
+        },
+    }
+    if isinstance(net_cfg, dict) and net_cfg.get("interfaces"):
+        report["host"]["interfaces"] = list(net_cfg["interfaces"])
+    if docker_blocks:
+        report["docker"] = [
+            {"compose": b["compose"], "containers": b.get("containers") or [], "starred": b.get("starred") or []}
+            for b in docker_blocks
+        ]
+
+    terminal_block: dict | None = None
+    if web_cfg and web_cfg.get("terminal"):
+        term = web_cfg["terminal"]
+        terminal_block = {
+            "enabled": True,
+            "shell": term.get("shell"),
+            "allow_users": term.get("allow_users") or [],
+            "audit": True,
+            "max_sessions": int(term.get("max_sessions", 1)),
+            "token_ttl": int(term.get("token_ttl", 1800)),
+        }
+
+    return {
+        "notifiers": [notifier],
+        "checks":    checks,
+        "report":    report,
+        "logs":      logs_cfg,
+        "terminal":  terminal_block,
+    }
+
+
+def build_boot_yaml(*, web_cfg: dict | None) -> str:
+    """Minimal config.yaml — only the bits the daemon needs BEFORE the DB
+    is open: where the SQLite file lives, web binding, JWT secret. Every
+    other setting now lives in the `settings` table and is edited via
+    the wizard or the web UI."""
+    parts: list[str] = []
+    parts.append("# Boot config — runtime settings (notifiers / checks /\n")
+    parts.append("# report / logs / terminal / users) live in the SQLite DB at\n")
+    parts.append("# `db.path`. Re-run `make setup` or use the web UI to edit them.\n\n")
+    parts.append("db:\n")
+    parts.append("  path: data/blackbox.sqlite\n")
+
+    if not (web_cfg and web_cfg.get("enabled")):
+        return "".join(parts)
+
+    port = int(web_cfg.get("port", 8765))
+    jwt_blk = web_cfg.get("jwt") or {}
+    secret = jwt_blk.get("secret", "")
+    expiry = int(jwt_blk.get("expiry_seconds", 7 * 24 * 3600))
+    parts.append(f"""
+web:
+  enabled: true
+  host: 0.0.0.0
+  port: {port}
+  prefix: /blackbox
+  jwt:
+    secret: "{secret}"
+    expiry_seconds: {expiry}
+""")
+    return "".join(parts)
+
+
+def persist_runtime_to_db(
+    db_path: Path,
+    settings: dict,
+    user: dict | None,
+) -> None:
+    """Initialize the DB if missing, then upsert the Settings singleton
+    and the admin User row. Called at the end of the wizard so the
+    operator's choices land in the live store immediately — no daemon
+    restart required for the import path; only for the boot YAML
+    (host/port/jwt) to take effect."""
+    sys.path.insert(0, str(PROJECT_ROOT / "src"))
+    try:
+        import time as _time
+        from sqlalchemy import create_engine
+        from sqlmodel import Session, SQLModel, select  # type: ignore
+
+        from db.models import Settings as SettingsRow, User as UserRow  # type: ignore
+    except ImportError:
+        warn_line("DB write skipped: src/ not importable from this venv")
+        return
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(f"sqlite:///{db_path}", echo=False, future=True)
+    SQLModel.metadata.create_all(engine)
+
+    with Session(engine) as s:
+        existing = s.get(SettingsRow, 1)
+        if existing:
+            existing.notifiers = settings.get("notifiers")
+            existing.checks    = settings.get("checks")
+            existing.report    = settings.get("report")
+            existing.logs      = settings.get("logs")
+            existing.terminal  = settings.get("terminal")
+            existing.updated_at = _time.time()
+            s.add(existing)
+        else:
+            s.add(SettingsRow(
+                id=1,
+                notifiers=settings.get("notifiers"),
+                checks=settings.get("checks"),
+                report=settings.get("report"),
+                logs=settings.get("logs"),
+                terminal=settings.get("terminal"),
+                updated_at=_time.time(),
+            ))
+
+        if user and user.get("username") and user.get("password_hash"):
+            row = s.exec(
+                select(UserRow).where(UserRow.username == user["username"]),
+            ).first()
+            if row:
+                row.password_hash = user["password_hash"]
+                row.role = "admin"
+                row.is_active = True
+                s.add(row)
+            else:
+                s.add(UserRow(
+                    username=user["username"],
+                    password_hash=user["password_hash"],
+                    role="admin",
+                    is_active=True,
+                    created_at=_time.time(),
+                ))
+        s.commit()
+    engine.dispose()
+
+
 def build_yaml(
+    *,
+    bot_token: str,
+    chat_id: str,
+    proxy: str = "",
+    hostname: str,
+    check_interval: int = 60,
+    report_interval: int,
+    warn_pct: int,
+    crit_pct: int,
+    disks: list[str],
+    docker_blocks: list[dict],
+    net_cfg: dict | bool = True,
+    systemd_units: list[str] | None = None,
+    logs_cfg: dict | None = None,
+    web_cfg: dict | None = None,
+    notifier_lang: str = "en",
+) -> str:
+    # Suppress unused-arg warnings — kept for API compat with the legacy
+    # callsite in run_wizard, which still passes everything in. The
+    # actual rendering ignores these and emits boot-only YAML.
+    _ = (bot_token, chat_id, proxy, hostname, check_interval, report_interval,
+         warn_pct, crit_pct, disks, docker_blocks, net_cfg, systemd_units,
+         logs_cfg, notifier_lang)
+    return build_boot_yaml(web_cfg=web_cfg)
+
+
+def _legacy_build_yaml(
     *,
     bot_token: str,
     chat_id: str,

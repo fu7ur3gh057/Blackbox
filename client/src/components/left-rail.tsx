@@ -12,6 +12,7 @@ import {
   Settings,
   SquareTerminal,
   Terminal,
+  Users as UsersIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ const NAV: { href: string; Icon: LucideIcon; label: string }[] = [
   { href: "/docker",   Icon: Boxes,           label: "Docker" },
   { href: "/logs",     Icon: Terminal,        label: "Logs" },
   { href: "/terminal", Icon: SquareTerminal,  label: "Terminal" },
+  { href: "/users",    Icon: UsersIcon,       label: "Users" },
 ];
 
 export function LeftRail() {

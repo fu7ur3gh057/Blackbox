@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 
 export interface MeResponse {
   username: string;
+  role: "admin" | "viewer" | string;
   expires_at: number;
 }
 
