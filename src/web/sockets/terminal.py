@@ -239,8 +239,13 @@ class TerminalNamespace(AsyncNamespace):
                 except PermissionError:
                     pass
 
+            # Just `-i` — `-l` adds login-shell profile sourcing
+            # (/etc/profile, ~/.profile, …) which sometimes exits early
+            # for non-tty heuristics or PAM-driven `if shopt -q login`
+            # checks. Interactive without login is enough for a web
+            # shell — the user can `bash -l` themselves if they care.
             proc = subprocess.Popen(
-                [shell, "-i", "-l"],
+                [shell, "-i"],
                 stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
                 preexec_fn=_child_setup,
                 cwd=cwd,
@@ -323,12 +328,21 @@ class TerminalNamespace(AsyncNamespace):
             return
         try:
             data = os.read(sess.master_fd, 4096)
+        except BlockingIOError:
+            # Spurious wakeup on non-blocking master — no data yet.
+            # Without this catch we'd treat EAGAIN as EOF and tear down
+            # the session before the shell even finished printing PS1.
+            return
         except (OSError, ValueError):
             data = b""
         if not data:
-            # EOF — child exited. Tell client and disconnect.
+            # EOF — child closed its end. Reap so we know the exit code
+            # and surface it in the audit row + the `terminal:exit` payload.
+            rc = sess.proc.poll()
+            log.info("terminal: %s child %d exited (rc=%s)", sid, sess.proc.pid, rc)
+            reason = f"shell exited with code {rc}" if rc is not None else "shell exited"
             try:
-                await self.emit("terminal:exit", {"reason": "child exited"}, room=sid)
+                await self.emit("terminal:exit", {"reason": reason}, room=sid)
             except Exception:
                 pass
             try:
