@@ -1,4 +1,4 @@
-"""FastAPI app: factory, prefix, endpoints, CORS."""
+"""FastAPI app: factory, prefix, endpoints, CORS, client placeholder."""
 
 from fastapi.testclient import TestClient
 
@@ -105,3 +105,18 @@ def test_cors_rejects_unknown_origin():
             },
         )
     assert "access-control-allow-origin" not in r.headers
+
+
+# ── client placeholder when not built ──────────────────────────────────────
+
+def test_client_placeholder_when_not_built():
+    """If client/out doesn't exist, the prefix root serves a small HTML
+    page that tells the operator how to build the bundle. /api/* must
+    keep working regardless."""
+    app = get_app(prefix="/blackbox")
+    with TestClient(app) as client:
+        r = client.get("/blackbox/")
+    assert r.status_code == 200
+    body = r.text
+    assert "client not built" in body.lower()
+    assert "/blackbox/api/docs" in body

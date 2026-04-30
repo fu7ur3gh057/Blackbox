@@ -16,3 +16,9 @@ config.yaml.bak
 client/*.png
 client/*.jpg
 client/*.jpeg
+
+# Next.js client build artifacts
+client/node_modules/
+client/.next/
+client/out/
+client/next-env.d.ts

@@ -6,8 +6,12 @@ PY := $(VENV)/bin/python
 CONFIG := config.yaml
 SERVICE := blackbox
 UNIT_PATH := /etc/systemd/system/$(SERVICE).service
+CLIENT_DIR := client
 
-.PHONY: help setup install run run-web install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
+# pnpm preferred, fall back to npm
+PKG := $(shell command -v pnpm 2>/dev/null || command -v npm 2>/dev/null)
+
+.PHONY: help setup install run run-web client-install client-dev client-build client-clean install-service uninstall-service install-cli uninstall-cli start stop restart status logs clean
 
 help:
 	@echo "BlackBox — targets:"
@@ -15,6 +19,12 @@ help:
 	@echo "  make install            создать venv и поставить зависимости"
 	@echo "  make run                воркер в foreground (нужен $(CONFIG))"
 	@echo "  make run-web            воркер + FastAPI на 127.0.0.1:8765"
+	@echo ""
+	@echo "  make client-install     поставить npm-зависимости фронта"
+	@echo "  make client-dev         запустить Next.js dev-сервер (proxy на бэк)"
+	@echo "  make client-build       собрать статику в client/out (бэк её отдаёт)"
+	@echo "  make client-clean       снести client/.next и client/out"
+	@echo ""
 	@echo "  make install-service    поставить systemd-юнит (sudo)"
 	@echo "  make uninstall-service  остановить и удалить systemd-юнит (sudo)"
 	@echo "  make install-cli        поставить глобальную команду 'blackbox' в ~/.local/bin"
@@ -37,6 +47,25 @@ run: install
 run-web: install
 	@if [ ! -f $(CONFIG) ]; then echo "$(CONFIG) не найден — запусти 'make setup'"; exit 1; fi
 	PYTHONPATH=src $(PY) -m main $(CONFIG) --web
+
+# ── client (Next.js) ─────────────────────────────────────────────────────
+
+client-install:
+	@if [ -z "$(PKG)" ]; then echo "neither pnpm nor npm found — install Node 20+ first"; exit 1; fi
+	cd $(CLIENT_DIR) && $(PKG) install
+
+client-dev:
+	@if [ -z "$(PKG)" ]; then echo "neither pnpm nor npm found"; exit 1; fi
+	cd $(CLIENT_DIR) && $(PKG) run dev
+
+client-build:
+	@if [ -z "$(PKG)" ]; then echo "neither pnpm nor npm found"; exit 1; fi
+	cd $(CLIENT_DIR) && $(PKG) run build
+
+client-clean:
+	rm -rf $(CLIENT_DIR)/.next $(CLIENT_DIR)/out
+
+# ── service ──────────────────────────────────────────────────────────────
 
 install-service:
 	@bash deploy/scripts/install-service.sh
