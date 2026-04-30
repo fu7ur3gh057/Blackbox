@@ -42,9 +42,38 @@ EOF
 
     if [ ! -x .venv/bin/python ]; then
         echo "  creating venv with $PYTHON..."
-        "$PYTHON" -m venv .venv >/dev/null
+        if ! "$PYTHON" -m venv .venv; then
+            cat >&2 <<EOF
+
+Failed to create venv with $PYTHON. On Debian/Ubuntu install the matching
+venv package:
+  sudo apt install -y ${PYTHON}-venv
+
+EOF
+            return 1
+        fi
     fi
 
-    .venv/bin/pip install -q --upgrade pip
-    .venv/bin/pip install -q -r requirements.txt
+    # On some distros (Debian/Ubuntu without python3-venv, or a partially-broken
+    # leftover venv), .venv/bin/python exists but pip is missing. Bootstrap it.
+    if [ ! -x .venv/bin/pip ]; then
+        echo "  bootstrapping pip..."
+        if ! .venv/bin/python -m ensurepip --upgrade >/dev/null 2>&1; then
+            cat >&2 <<EOF
+
+Venv is missing pip and ensurepip failed. On Debian/Ubuntu install:
+  sudo apt install -y ${PYTHON}-venv python3-pip
+
+Then drop the broken venv and retry:
+  rm -rf "$PROJECT_ROOT/.venv"
+
+EOF
+            return 1
+        fi
+    fi
+
+    # Use 'python -m pip' instead of '.venv/bin/pip' — works even if the pip
+    # entrypoint script is broken or absent but the pip module is importable.
+    .venv/bin/python -m pip install -q --upgrade pip
+    .venv/bin/python -m pip install -q -r requirements.txt
 }
