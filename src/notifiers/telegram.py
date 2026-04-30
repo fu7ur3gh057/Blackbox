@@ -12,12 +12,14 @@ _LEVEL_ICON = {"ok": "✅", "warn": "🟡", "crit": "🔴"}
 _LABELS = {
     "en": {
         "startup": "Monitoring connected",
+        "shutdown": "Monitoring stopped",
         "log_first": "New error",
         "log_digest": "Error digest",
         "log_digest_period": "last period",
     },
     "ru": {
         "startup": "Мониторинг подключен",
+        "shutdown": "Мониторинг остановлен",
         "log_first": "Новая ошибка",
         "log_digest": "Дайджест ошибок",
         "log_digest_period": "за последний период",
@@ -150,6 +152,14 @@ class TelegramNotifier:
         label = _LABELS[self.lang]["startup"]
         text = (
             f"🟢 <b>{label}</b>\n\n"
+            f"<i>{fmt_now(self.lang)}</i>"
+        )
+        await self._send(text)
+
+    async def send_shutdown(self) -> None:
+        label = _LABELS[self.lang]["shutdown"]
+        text = (
+            f"⏹ <b>{label}</b>\n\n"
             f"<i>{fmt_now(self.lang)}</i>"
         )
         await self._send(text)

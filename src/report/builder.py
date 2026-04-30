@@ -87,4 +87,5 @@ def _recommendations(warnings: list[str], lang: str) -> str | None:
         return None
     header = _RECS_HEADER.get(lang, _RECS_HEADER["en"])
     body = "\n".join(f"• {_esc(r)}" for r in recs)
-    return f"<b>{header}</b>\n{body}"
+    # body wrapped in spoiler — keeps the report tidy at a glance, tap to reveal.
+    return f"<b>{header}</b>\n<tg-spoiler>{body}</tg-spoiler>"

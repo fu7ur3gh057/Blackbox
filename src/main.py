@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import signal
 import sys
 from pathlib import Path
 
@@ -30,10 +31,10 @@ async def _run(config: Config) -> None:
         except Exception:
             log.exception("startup notification failed for %s", type(n).__name__)
 
-    tasks = []
+    coros = []
 
     if config.checks:
-        tasks.append(Runner(config, all_notifiers).run())
+        coros.append(Runner(config, all_notifiers).run())
 
     if config.report:
         from .report import build_report_runner
@@ -43,20 +44,50 @@ async def _run(config: Config) -> None:
             config.report, notifiers_by_type, logs_storage_path=logs_path,
         )
         if report_runner is not None:
-            tasks.append(report_runner.run())
+            coros.append(report_runner.run())
 
     if config.logs:
         from .logs import build_log_processor
 
         log_processor = build_log_processor(config.logs, notifiers_by_type)
         if log_processor is not None:
-            tasks.append(log_processor.run())
+            coros.append(log_processor.run())
 
-    if not tasks:
+    if not coros:
         log.warning("nothing to run, exiting")
         return
 
-    await asyncio.gather(*tasks)
+    tasks = [asyncio.create_task(c) for c in coros]
+
+    loop = asyncio.get_running_loop()
+    stop = loop.create_future()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            loop.add_signal_handler(sig, _set_if_pending, stop, sig.name)
+        except (NotImplementedError, RuntimeError):
+            pass
+
+    try:
+        await asyncio.wait(
+            [stop, *tasks], return_when=asyncio.FIRST_COMPLETED,
+        )
+        if stop.done():
+            log.info("received %s, shutting down", stop.result())
+    finally:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        for n in all_notifiers:
+            try:
+                await asyncio.wait_for(n.send_shutdown(), timeout=5)
+            except Exception:
+                log.exception("shutdown notification failed for %s", type(n).__name__)
+
+
+def _set_if_pending(fut: asyncio.Future, value: str) -> None:
+    if not fut.done():
+        fut.set_result(value)
 
 
 if __name__ == "__main__":
