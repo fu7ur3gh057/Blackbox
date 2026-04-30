@@ -54,10 +54,10 @@ export function Heartbeat() {
       <PanelHeader className="pb-1">
         <div className="flex items-center justify-between">
           <PanelTitle className="text-[13px] flex items-center gap-2">
-            <Activity size={13} className="text-accent-green" /> System pulse
+            <Activity size={13} className="text-accent-pale" /> System pulse
           </PanelTitle>
           <span className="text-[11px] text-ink-mute tabular-nums">
-            <span className="text-accent-green font-semibold text-[13px]">{bpm}</span> bpm
+            <span className="text-accent-pale font-semibold text-[13px]">{bpm}</span> bpm
           </span>
         </div>
       </PanelHeader>
@@ -81,13 +81,13 @@ export function Heartbeat() {
           <svg viewBox="0 0 800 100" className="w-full h-full" preserveAspectRatio="none">
             <defs>
               <linearGradient id="ecg-stroke" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%"  stopColor="#22FF66" stopOpacity="0.4" />
-                <stop offset="50%" stopColor="#22FF66" stopOpacity="1" />
+                <stop offset="0%"  stopColor="#8FBF98" stopOpacity="0.4" />
+                <stop offset="50%" stopColor="#8FBF98" stopOpacity="1" />
                 <stop offset="100%" stopColor="#FFFFFF" stopOpacity="1" />
               </linearGradient>
               <linearGradient id="ecg-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%"   stopColor="#22FF66" stopOpacity="0.18" />
-                <stop offset="100%" stopColor="#22FF66" stopOpacity="0" />
+                <stop offset="0%"   stopColor="#8FBF98" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#8FBF98" stopOpacity="0" />
               </linearGradient>
             </defs>
 

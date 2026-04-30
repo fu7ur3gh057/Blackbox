@@ -19,14 +19,12 @@ export function TopHeader() {
   const username = me.data?.username ?? "—";
 
   return (
-    <header className="flex items-center justify-between gap-4 px-7 py-5 border-b border-white/[0.04]">
-      {/* wordmark — terminal prompt */}
+    <header className="flex items-center justify-between gap-4 px-7 py-5">
+      {/* wordmark — terminal prompt, white text */}
       <div className="flex items-baseline gap-2 font-mono">
-        <span className="text-accent-green text-base">$</span>
-        <span className="text-lg tracking-tight text-ink-strong">
-          <span className="text-accent-green">black</span>box
-        </span>
-        <span className="text-accent-green cursor-blink text-base">_</span>
+        <span className="text-accent-pale text-base">$</span>
+        <span className="text-lg tracking-tight text-ink-strong">blackbox</span>
+        <span className="text-accent-pale cursor-blink text-base">_</span>
         <span className="ml-3 text-[11px] text-ink-mute uppercase tracking-[0.2em]">monitoring</span>
       </div>
 

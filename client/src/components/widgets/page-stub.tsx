@@ -12,7 +12,7 @@ export function PageStub({ Icon, title, blurb, bullets }: PageStubProps) {
   return (
     <Panel className="max-w-[1100px]">
       <PanelHeader className="flex items-center gap-3 pb-1">
-        <div className="h-9 w-9 rounded-xl bg-accent-green/12 text-accent-green flex items-center justify-center">
+        <div className="h-9 w-9 rounded-xl bg-accent-green/12 text-accent-pale flex items-center justify-center">
           <Icon size={16} strokeWidth={1.8} />
         </div>
         <PanelTitle className="text-[16px]">{title}</PanelTitle>

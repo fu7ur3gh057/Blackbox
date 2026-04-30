@@ -69,13 +69,13 @@ body::after {
     @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium;
   }
   .pill-active {
-    @apply pill bg-accent-green text-canvas font-semibold shadow-chip;
+    @apply pill bg-accent-pale/[0.15] text-ink-strong border border-accent-pale/30 font-semibold;
   }
   .pill-ghost {
     @apply pill bg-white/[0.04] text-ink-dim border border-white/[0.06];
   }
   .pill-green {
-    @apply pill bg-accent-green/12 text-accent-green border border-accent-green/25;
+    @apply pill bg-accent-pale/[0.12] text-accent-pale border border-accent-pale/25;
   }
 }
 
@@ -102,13 +102,14 @@ body::after {
 .pulse-green { animation: pulse-dot 2s ease-out infinite; }
 
 @keyframes reveal-in {
-  0%   { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(6px); }
-  60%  { opacity: 1; filter: blur(0); }
+  0%   { opacity: 0; transform: translateY(16px) scale(0.97); filter: blur(10px); }
+  35%  { opacity: 0.55; filter: blur(6px); }
+  70%  { opacity: 1;   filter: blur(0); }
   100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 .reveal {
   opacity: 0;
-  animation: reveal-in 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: reveal-in 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes blink {

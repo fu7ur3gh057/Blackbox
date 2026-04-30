@@ -44,7 +44,7 @@ export function HealthyList() {
                 i !== calm.length - 1 && "border-b border-dashed border-white/[0.06]",
               )}
             >
-              <div className="h-8 w-8 rounded-full bg-accent-green/15 text-accent-green flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-accent-green/15 text-accent-pale flex items-center justify-center">
                 <Icon size={14} strokeWidth={1.8} />
               </div>
               <div className="flex-1 min-w-0">

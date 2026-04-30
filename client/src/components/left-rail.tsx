@@ -24,10 +24,10 @@ const NAV: { href: string; Icon: LucideIcon; label: string }[] = [
 export function LeftRail() {
   const pathname = usePathname();
   return (
-    <aside className="relative flex flex-col items-center py-5 gap-2 border-r border-white/[0.04]">
-      {/* logo — terminal prompt */}
+    <aside className="relative flex flex-col items-center py-5 gap-2 h-full">
+      {/* logo — terminal prompt, white on dark with pale-green ring */}
       <Link href="/" className="mb-3" title="blackbox">
-        <div className="h-9 w-9 rounded-2xl bg-accent-green flex items-center justify-center text-canvas font-bold font-mono text-[18px] shadow-chip">
+        <div className="h-9 w-9 rounded-2xl bg-canvas-elev2 border border-accent-pale/40 flex items-center justify-center text-ink-strong font-bold font-mono text-[18px]">
           &gt;
         </div>
       </Link>
@@ -42,12 +42,12 @@ export function LeftRail() {
             className={cn(
               "group relative h-10 w-10 rounded-xl flex items-center justify-center transition",
               active
-                ? "bg-accent-green/15 text-accent-green"
+                ? "bg-accent-pale/12 text-accent-pale"
                 : "text-ink-mute hover:text-ink hover:bg-white/[0.03]",
             )}
           >
             {active && (
-              <span className="absolute -left-[1.4rem] top-2 bottom-2 w-[3px] rounded-full bg-accent-green" />
+              <span className="absolute -left-[1.4rem] top-2 bottom-2 w-[3px] rounded-full bg-accent-pale" />
             )}
             <Icon size={17} strokeWidth={1.8} />
           </Link>

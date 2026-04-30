@@ -12,12 +12,13 @@ const config: Config = {
           elev2:   "#0F1410",   // popovers / nested cards
           line:    "rgba(34,255,102,0.06)",
         },
-        // Accents — matrix terminal language
+        // Accents — pale green dominant, bright reserved for live signal
         accent: {
-          green:  "#22FF66",
-          bright: "#7CFFA0",
-          dim:    "#0F5132",
-          glow:   "rgba(34,255,102,0.45)",
+          pale:   "#8FBF98",   // default green tone — most widget details
+          green:  "#22FF66",   // signal — only on true emphasis
+          bright: "#7CFFA0",   // hover / secondary
+          dim:    "#1A2820",
+          glow:   "rgba(143, 191, 152, 0.40)",
         },
         // Text
         ink: {

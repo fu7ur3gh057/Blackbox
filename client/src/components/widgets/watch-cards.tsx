@@ -36,7 +36,7 @@ export function WatchCards() {
     <Panel>
       <PanelHeader className="flex items-center justify-between pb-2">
         <PanelTitle className="flex items-center gap-2">
-          <Boxes size={14} className="text-accent-green" /> Ongoing services
+          <Boxes size={14} className="text-accent-pale" /> Ongoing services
         </PanelTitle>
         <span className="text-[10px] text-ink-mute">{data.length} project{data.length === 1 ? "" : "s"}</span>
       </PanelHeader>

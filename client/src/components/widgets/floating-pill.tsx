@@ -26,14 +26,14 @@ export function FloatingPill() {
   if (!data) return null;
 
   return (
-    <div className="fixed bottom-7 right-7 z-30 pointer-events-none">
-      <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-accent-green pl-3 pr-4 py-2 shadow-chip">
-        <div className="h-7 w-7 rounded-full bg-black/30 flex items-center justify-center">
-          <ArrowUpRight size={14} className="text-white" strokeWidth={2.5} />
+    <div className="fixed bottom-7 right-[88px] z-40 pointer-events-none">
+      <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full bg-canvas-elev pl-3 pr-4 py-2 border border-accent-pale/35 shadow-soft">
+        <div className="h-7 w-7 rounded-full bg-accent-pale/15 border border-accent-pale/40 flex items-center justify-center">
+          <ArrowUpRight size={14} className="text-accent-pale" strokeWidth={2.5} />
         </div>
         <div className="leading-tight">
-          <div className="text-[10px] uppercase tracking-wider text-black/60 font-medium">uptime</div>
-          <div className="text-[15px] font-bold text-black tabular-nums">
+          <div className="text-[10px] uppercase tracking-wider text-ink-mute font-medium">uptime</div>
+          <div className="text-[15px] font-bold text-ink-strong tabular-nums">
             {formatUptime(data.uptime_seconds)}
           </div>
         </div>

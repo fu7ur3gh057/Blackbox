@@ -37,7 +37,7 @@ export default function LoginPage() {
       <div className="panel w-full max-w-sm p-8">
         <div className="flex items-baseline gap-3 mb-8">
           <span className="text-2xl font-semibold tracking-tight text-ink-strong">
-            black<span className="text-accent-green">box</span>
+            black<span className="text-accent-pale">box</span>
           </span>
           <span className="text-[10px] uppercase tracking-[0.2em] text-ink-mute">monitoring</span>
         </div>
