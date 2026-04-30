@@ -113,13 +113,11 @@ LOCALES: dict[str, dict[str, str]] = {
         "logs_hint_perm": "[dim]not readable for {user} — daemon must run as root or fix perms[/dim]",
         "section_web": "Web client (FastAPI)",
         "ask_web_yn": "expose the web client (Swagger + admin API)?",
-        "ask_terminal_yn": "enable in-browser TERMINAL? (root shell — opt-in, separate password)",
-        "ask_terminal_shell": "  shell",
-        "ask_terminal_username": "  terminal username (separate from web admin)",
-        "ask_terminal_password": "  terminal password (8+ chars)",
-        "ask_terminal_password_confirm": "  repeat password",
+        "ask_terminal_yn": "enable in-browser TERMINAL? (root shell — opt-in, system user/password via PAM)",
+        "ask_terminal_shell": "  shell — leave blank to use each user's /etc/passwd entry (recommended)",
+        "ask_terminal_allow": "  allow_users (comma-separated, blank = any system user)",
         "ask_terminal_ttl": "  unlock-token TTL, sec — auto-relock after",
-        "terminal_warn": "[yellow]![/yellow] every keystroke is logged to terminal_audit (passwords too); credentials are SEPARATE from the web admin login",
+        "terminal_warn": "[yellow]![/yellow] every keystroke is logged to terminal_audit (incl. typed passwords); login uses normal SYSTEM accounts via PAM",
         "ask_web_port": "  port",
         "ask_web_username": "  admin username",
         "ask_web_password": "  admin password (8+ chars)",
@@ -243,13 +241,11 @@ LOCALES: dict[str, dict[str, str]] = {
         "logs_hint_perm": "[dim]не читается для {user} — демон должен быть от root или поправь права[/dim]",
         "section_web": "Веб-клиент (FastAPI)",
         "ask_web_yn": "поднимать веб-клиент (Swagger + admin API)?",
-        "ask_terminal_yn": "включить ТЕРМИНАЛ в браузере? (root shell — opt-in, отдельный пароль)",
-        "ask_terminal_shell": "  shell",
-        "ask_terminal_username": "  логин для терминала (отдельный от админа)",
-        "ask_terminal_password": "  пароль терминала (8+ символов)",
-        "ask_terminal_password_confirm": "  повтори пароль",
+        "ask_terminal_yn": "включить ТЕРМИНАЛ в браузере? (root shell — opt-in, login через системные креды/PAM)",
+        "ask_terminal_shell": "  shell — пусто = брать из /etc/passwd для каждого юзера (рекомендуется)",
+        "ask_terminal_allow": "  allow_users (через запятую, пусто = любой системный юзер)",
         "ask_terminal_ttl": "  TTL токена анлока, сек — авто-блокировка после",
-        "terminal_warn": "[yellow]![/yellow] каждое нажатие пишется в terminal_audit (включая пароли); креды ОТДЕЛЬНЫЕ от веб-админа",
+        "terminal_warn": "[yellow]![/yellow] каждое нажатие пишется в terminal_audit (включая набранные пароли); login — обычные СИСТЕМНЫЕ учётки через PAM",
         "ask_web_port": "  порт",
         "ask_web_username": "  логин админа",
         "ask_web_password": "  пароль админа (8+ символов)",
@@ -993,35 +989,20 @@ def configure_web() -> dict | None:
     user_block, jwt_block = _gather_web_user()
     console.print(f"  [dim italic]{t('web_url_hint', port=port)}[/dim italic]")
 
-    # Optional in-browser terminal — opt-in, default off. Requires a
-    # SEPARATE username + password (defence in depth: a stolen
-    # bb_session cookie alone can't open a shell). Wizard hashes the
-    # password with bcrypt before writing.
+    # Optional in-browser terminal — opt-in, default off. PAM-authenticates
+    # against system users (any unix account with a valid password works).
+    # Optionally restricted to a whitelist via allow_users.
     terminal_block: dict | None = None
     console.print(f"  {t('terminal_warn')}")
     if Confirm.ask(f"  {t('ask_terminal_yn')}", default=False):
-        import bcrypt as _bcrypt
-        shell = Prompt.ask(t("ask_terminal_shell"), default="/bin/bash") or "/bin/bash"
-        term_username = Prompt.ask(t("ask_terminal_username"), default="blackbox-term") or "blackbox-term"
-        while True:
-            term_password = Prompt.ask(t("ask_terminal_password"), password=True)
-            if len(term_password) < 8:
-                warn_line(t("web_password_short"))
-                continue
-            confirm_pw = Prompt.ask(t("ask_terminal_password_confirm"), password=True)
-            if term_password != confirm_pw:
-                warn_line(t("web_password_mismatch"))
-                continue
-            break
-        term_hash = _bcrypt.hashpw(
-            term_password.encode("utf-8"), _bcrypt.gensalt(),
-        ).decode("utf-8")
+        shell = Prompt.ask(t("ask_terminal_shell"), default="") or ""
+        allow_raw = Prompt.ask(t("ask_terminal_allow"), default="") or ""
+        allow_users = [u.strip() for u in allow_raw.split(",") if u.strip()]
         ttl = _ask_seconds("ask_terminal_ttl", default=1800, minimum=60)
         terminal_block = {
             "enabled": True,
-            "user": {"username": term_username, "password_hash": term_hash},
-            "shell": shell,
-            "cwd": "/",
+            "shell": shell or None,
+            "allow_users": allow_users,
             "audit": True,
             "max_sessions": 1,
             "token_ttl": ttl,
@@ -1520,25 +1501,19 @@ web:
 """)
         term = web_cfg.get("terminal") or {}
         if term.get("enabled"):
-            shell = term.get("shell", "/bin/bash")
-            cwd = term.get("cwd", "/")
             max_sessions = int(term.get("max_sessions", 1))
             ttl = int(term.get("token_ttl", 1800))
-            tu = term.get("user") or {}
-            tu_username = tu.get("username", "blackbox-term")
-            tu_hash = tu.get("password_hash", "")
-            parts.append(f"""\
-  terminal:
-    enabled: true
-    user:
-      username: {tu_username}
-      password_hash: "{tu_hash}"
-    shell: {shell}
-    cwd: {cwd}
-    audit: true
-    max_sessions: {max_sessions}
-    token_ttl: {ttl}
-""")
+            shell = term.get("shell")
+            allow_users = term.get("allow_users") or []
+            parts.append("  terminal:\n")
+            parts.append("    enabled: true\n")
+            if shell:
+                parts.append(f"    shell: {shell}\n")
+            if allow_users:
+                parts.append(f"    allow_users: [{', '.join(allow_users)}]\n")
+            parts.append("    audit: true\n")
+            parts.append(f"    max_sessions: {max_sessions}\n")
+            parts.append(f"    token_ttl: {ttl}\n")
     return "".join(parts)
 
 

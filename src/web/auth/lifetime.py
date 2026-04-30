@@ -43,23 +43,9 @@ def init_auth(config: Config) -> None:
     broker.state.web_jwt_secret = secret
     broker.state.web_jwt_expiry = int(jwt_cfg.get("expiry_seconds", _DEFAULT_EXPIRY_SECONDS))
 
-    # Terminal credentials are SEPARATE from the web admin login on
-    # purpose — defence in depth. Even if bb_session leaks the attacker
-    # can't open a root shell without this second password.
+    # Terminal auth is now PAM-based against system users — no separate
+    # creds in config.yaml. The terminal_token_ttl knob still controls
+    # how long an unlock-token stays valid before auto-relock.
     term_cfg = (web.get("terminal") or {})
-    term_user = (term_cfg.get("user") or {})
-    if term_cfg.get("enabled"):
-        if term_user.get("username") and term_user.get("password_hash"):
-            broker.state.terminal_user = {
-                "username": term_user["username"],
-                "password_hash": term_user["password_hash"],
-            }
-            broker.state.terminal_token_ttl = int(term_cfg.get("token_ttl", 1800))
-        else:
-            broker.state.terminal_user = None
-            log.warning(
-                "web.terminal.enabled is true but no terminal.user.{username,password_hash} "
-                "configured — terminal access will be refused."
-            )
-    else:
-        broker.state.terminal_user = None
+    broker.state.terminal_enabled = bool(term_cfg.get("enabled"))
+    broker.state.terminal_token_ttl = int(term_cfg.get("token_ttl", 1800))

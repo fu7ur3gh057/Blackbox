@@ -110,17 +110,15 @@ web:
   port: 8765
   prefix: /blackbox            # URL prefix; "" disables prefixing
 
-  # In-browser terminal — opt-in, separate credentials from the web admin
-  # (defence in depth: a stolen bb_session cookie alone cannot open a
-  # shell). Every keystroke is logged to `terminal_audit` (passwords
-  # typed at prompts too — guard the DB). Single session per user.
+  # In-browser terminal — opt-in. Login uses system users via PAM (any
+  # unix account with a valid password). The shell forks under that
+  # user, so blackbox MUST run as root for `setuid` to non-self users
+  # to work. Every keystroke is logged to `terminal_audit` (typed
+  # passwords too — guard the DB). Single session per user enforced.
   # terminal:
   #   enabled: true
-  #   user:
-  #     username: blackbox-term
-  #     password_hash: "$2b$12$…"     # bcrypt — generate via the wizard
-  #   shell: /bin/bash
-  #   cwd: /
+  #   # shell: /bin/bash             # leave unset to use each user's pw_shell
+  #   allow_users: [fuad, admin]     # optional whitelist; empty/unset = any user
   #   audit: true
   #   max_sessions: 1
-  #   token_ttl: 1800                  # seconds; auto-relock after
+  #   token_ttl: 1800                # seconds; auto-relock after

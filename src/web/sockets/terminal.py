@@ -1,6 +1,11 @@
 """In-browser shell: PTY pump over a Socket.IO namespace.
 
-Each client connection forks a PTY and execs the configured shell.
+Each client connection forks a PTY and execs the configured shell — as
+the unix user that PAM-authenticated through /api/terminal/unlock. The
+daemon must run as root to drop privileges via setuid/setgid; if it
+doesn't, the namespace refuses any login that isn't the same user the
+process is already running as.
+
 Bytes coming from the browser (`terminal:input`) write straight into the
 pty master; bytes coming out of the pty are emitted back as
 `terminal:output`. Window resize comes in as `terminal:resize` and is
@@ -8,9 +13,8 @@ forwarded via TIOCSWINSZ.
 
 Three guardrails baked in:
 
-  - **opt-in**: the namespace is registered only when
-    `web.terminal.enabled: true` is set in config.yaml, so a default
-    install doesn't expose a root shell to anyone with the JWT cookie.
+  - **two-step auth**: bb_session JWT cookie + PAM-validated
+    unix user/password via the terminal_token in the WS auth payload.
   - **single session per user**: a second connect with the same username
     is refused — keeps fork bombs / stuck handles bounded.
   - **audit**: every input chunk is persisted to `terminal_audit`. The
@@ -25,6 +29,7 @@ import fcntl
 import logging
 import os
 import pty
+import pwd
 import signal
 import struct
 import subprocess
@@ -123,11 +128,10 @@ class TerminalNamespace(AsyncNamespace):
         web_user = session_claims.get("sub", "")
 
         # Step 2: terminal token — issued by POST /api/terminal/unlock
-        # after a separate username/password check. Must carry aud=terminal.
-        # If `web.terminal.user` isn't configured at all, we refuse — the
-        # operator hasn't opted in to terminal access yet.
-        if broker.state.data.get("terminal_user") is None:
-            log.info("terminal: refusing %s — terminal user not configured", sid)
+        # after PAM-authenticating a unix user/password. Must carry
+        # aud=terminal and the unix `sub` we're going to fork as.
+        if not broker.state.data.get("terminal_enabled"):
+            log.info("terminal: refusing %s — terminal disabled in config", sid)
             return False
 
         term_token = (auth or {}).get("terminal_token") if isinstance(auth, dict) else None
@@ -143,9 +147,12 @@ class TerminalNamespace(AsyncNamespace):
             log.info("terminal: refusing %s — token wrong audience", sid)
             return False
 
-        # The terminal token's `sub` is the terminal user; we tag the
-        # session with the WEB user so audit + alerts attribute correctly.
-        username = web_user or term_claims.get("sub", "")
+        # The terminal token's `sub` is the unix user we'll fork as.
+        # Use it for the single-session lock and audit attribution; the
+        # web admin user goes into the `via` claim for forensics.
+        username = term_claims.get("sub", "")
+        if not username:
+            return False
 
         # Single-session lock — refuse if user already has a session.
         existing = self._user_to_sid.get(username)
@@ -154,25 +161,75 @@ class TerminalNamespace(AsyncNamespace):
             await _audit("denied", sid, username, "another session active")
             return False
 
+        # Resolve the unix user so we can fork as them.
+        try:
+            pw = pwd.getpwnam(username)
+        except KeyError:
+            log.warning("terminal: refusing %s — unix user %r not in /etc/passwd", sid, username)
+            return False
+
+        # Daemon must be root to setuid to anyone else. If it's not,
+        # only the same-user case is permitted (so a dev running blackbox
+        # under their own account can still test the page).
+        running_uid = os.getuid()
+        if running_uid != 0 and running_uid != pw.pw_uid:
+            log.warning(
+                "terminal: refusing %s — daemon is not root (uid=%d) so cannot setuid to %s (uid=%d)",
+                sid, running_uid, username, pw.pw_uid,
+            )
+            return False
+
         cfg = _terminal_cfg()
-        shell = cfg.get("shell", "/bin/bash")
-        cwd = cfg.get("cwd", "/")
+        shell_cfg = cfg.get("shell")
+        # If the operator left shell empty/auto, fall back to the user's
+        # /etc/passwd entry, then bash, then sh. Anything explicit in
+        # config wins — handy if you want every session to use zsh
+        # regardless of the user's pw_shell.
+        shell = (
+            shell_cfg
+            or (pw.pw_shell if pw.pw_shell and pw.pw_shell != "/usr/sbin/nologin" else None)
+            or "/bin/bash"
+        )
+        cwd_cfg = cfg.get("cwd")
+        cwd = cwd_cfg if (cwd_cfg and os.path.isdir(cwd_cfg)) else (
+            pw.pw_dir if os.path.isdir(pw.pw_dir or "") else "/tmp"
+        )
+
+        # Build a clean env that looks like a fresh login shell.
         env = {
-            **os.environ,
-            "TERM": "xterm-256color",
-            "COLORTERM": "truecolor",
-            "LANG": os.environ.get("LANG", "C.UTF-8"),
+            "HOME":        pw.pw_dir or "/tmp",
+            "USER":        username,
+            "LOGNAME":     username,
+            "SHELL":       shell,
+            "PATH":        os.environ.get("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"),
+            "TERM":        "xterm-256color",
+            "COLORTERM":   "truecolor",
+            "LANG":        os.environ.get("LANG", "C.UTF-8"),
+            "LC_ALL":      os.environ.get("LC_ALL", os.environ.get("LANG", "C.UTF-8")),
         }
+
+        def _drop_privs() -> None:
+            # Must run before exec — sets the child up as the target uid.
+            os.setsid()                                       # new session
+            try:
+                os.initgroups(username, pw.pw_gid)            # supplementary groups
+            except PermissionError:
+                pass                                          # not root → already same-user; skip
+            try:
+                os.setgid(pw.pw_gid)
+                os.setuid(pw.pw_uid)
+            except PermissionError:
+                pass                                          # same-user case; nothing to do
 
         try:
             master_fd, slave_fd = pty.openpty()
             # Sane initial size — client will TIOCSWINSZ on its first frame.
             fcntl.ioctl(master_fd, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
             proc = subprocess.Popen(
-                [shell, "-i"],
+                [shell, "-i", "-l"],
                 stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
-                preexec_fn=os.setsid,           # new session → killpg works on shutdown
-                cwd=cwd if os.path.isdir(cwd) else None,
+                preexec_fn=_drop_privs,
+                cwd=cwd,
                 env=env,
                 close_fds=True,
             )
