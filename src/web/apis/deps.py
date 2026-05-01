@@ -8,7 +8,7 @@ Returns the JWT claims dict (e.g. `{"sub": "admin", ...}`) so handlers
 that care about the caller can pull `claims["sub"]`.
 """
 
-from fastapi import Cookie, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 from services.taskiq.broker import broker
@@ -41,3 +41,16 @@ async def require_auth(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="token expired")
     except InvalidTokenError:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid token")
+
+
+async def require_admin(claims: dict = Depends(require_auth)) -> dict:
+    """Stricter gate — only `role: admin` claims pass. Staff / viewer
+    JWTs are rejected with 403. Use this on routers that touch
+    privileged surface area (terminal shell, docker actions, user
+    management, runtime settings)."""
+    if claims.get("role") != "admin":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            detail="admin role required",
+        )
+    return claims

@@ -1,5 +1,6 @@
 "use client";
 
+import { RoleGate } from "@/components/role-gate";
 import { api, ApiError } from "@/lib/api";
 import { openTerminalSocket } from "@/lib/socket";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,14 @@ import "xterm/css/xterm.css";
  * drop back to the lock screen.
  */
 export default function TerminalPage() {
+  return (
+    <RoleGate allowed={["admin"]}>
+      <TerminalPageInner />
+    </RoleGate>
+  );
+}
+
+function TerminalPageInner() {
   const [enabled, setEnabled] = useState<boolean | null>(null); // null while probing
   const [token, setToken] = useState<string | null>(null);
   const [tokenExpiresAt, setTokenExpiresAt] = useState<number | null>(null);

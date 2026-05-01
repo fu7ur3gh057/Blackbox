@@ -106,8 +106,8 @@ async def create_user(
     session: AsyncSession = Depends(get_session),
 ) -> UserOut:
     _require_admin(claims)
-    if body.role not in {"admin", "viewer"}:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="role must be admin or viewer")
+    if body.role not in {"admin", "staff", "viewer"}:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="role must be admin, staff, or viewer")
     existing = (await session.exec(
         select(User).where(User.username == body.username),
     )).first()
@@ -144,8 +144,8 @@ async def update_user(
                             detail="you can't deactivate yourself")
 
     if body.role is not None:
-        if body.role not in {"admin", "viewer"}:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="role must be admin or viewer")
+        if body.role not in {"admin", "staff", "viewer"}:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="role must be admin, staff, or viewer")
         # Block demoting the last admin.
         if user.role == "admin" and body.role != "admin":
             count = await _count_active_admins(session)

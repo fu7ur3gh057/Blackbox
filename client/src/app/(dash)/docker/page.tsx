@@ -3,6 +3,7 @@
 import { DiscoverySection } from "@/components/docker/discovery-section";
 import { EventsTicker } from "@/components/docker/events-ticker";
 import { ProjectCard } from "@/components/docker/project-card";
+import { RoleGate } from "@/components/role-gate";
 import { useDockerSnapshot } from "@/lib/use-snapshot";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Boxes, CheckCircle2, Filter, Search, X } from "lucide-react";
@@ -15,6 +16,14 @@ import { useMemo, useState } from "react";
  * applied per project card.
  */
 export default function DockerPage() {
+  return (
+    <RoleGate allowed={["admin"]}>
+      <DockerPageInner />
+    </RoleGate>
+  );
+}
+
+function DockerPageInner() {
   const projects = useDockerSnapshot() ?? [];
   const [search, setSearch] = useState("");
   const [onlyUnhealthy, setOnlyUnhealthy] = useState(false);

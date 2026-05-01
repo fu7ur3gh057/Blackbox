@@ -250,6 +250,7 @@ function RoleSelect({
         )}
       >
         <option value="admin">admin</option>
+        <option value="staff">staff</option>
         <option value="viewer">viewer</option>
       </select>
     </div>
@@ -262,7 +263,7 @@ function RoleSelect({
 function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"admin" | "viewer">("viewer");
+  const [role, setRole] = useState<"admin" | "staff" | "viewer">("staff");
   const [error, setError] = useState<string | null>(null);
 
   const create = useMutation({
@@ -305,11 +306,12 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
         <Field label="role">
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as "admin" | "viewer")}
+            onChange={(e) => setRole(e.target.value as "admin" | "staff" | "viewer")}
             className={dialogInputClass}
           >
-            <option value="viewer">viewer</option>
-            <option value="admin">admin</option>
+            <option value="staff">staff (no terminal/docker)</option>
+            <option value="viewer">viewer (no terminal/docker)</option>
+            <option value="admin">admin (full access)</option>
           </select>
         </Field>
         {error && (

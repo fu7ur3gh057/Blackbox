@@ -26,7 +26,13 @@ log = logging.getLogger(__name__)
 
 class AuthedNamespace(AsyncNamespace):
     """JWT gate. Token comes from `auth.token` (Socket.IO standard) first,
-    then from the `bb_session` cookie set by /api/auth/login."""
+    then from the `bb_session` cookie set by /api/auth/login.
+
+    `ALLOWED_ROLES = None` (default) → any authenticated user passes.
+    Set to a frozenset of role strings to restrict (e.g. {"admin"}).
+    """
+
+    ALLOWED_ROLES: frozenset[str] | None = None
 
     async def on_connect(
         self,
@@ -51,9 +57,23 @@ class AuthedNamespace(AsyncNamespace):
                      self.namespace, sid, e)
             return False
 
-        await self.save_session(sid, {"username": claims.get("sub", "")})
-        log.info("sio: %s connected to %s as %s",
-                 sid, self.namespace, claims.get("sub", "?"))
+        # Sub-classes can opt into role-gating by overriding
+        # ALLOWED_ROLES (None = any logged-in user).
+        if self.ALLOWED_ROLES is not None:
+            role = claims.get("role", "admin")
+            if role not in self.ALLOWED_ROLES:
+                log.info(
+                    "sio: refusing %s — role %r not in %r (sid=%s)",
+                    self.namespace, role, self.ALLOWED_ROLES, sid,
+                )
+                return False
+
+        await self.save_session(sid, {
+            "username": claims.get("sub", ""),
+            "role": claims.get("role", "admin"),
+        })
+        log.info("sio: %s connected to %s as %s (role=%s)",
+                 sid, self.namespace, claims.get("sub", "?"), claims.get("role", "admin"))
         return None  # accept
 
     async def on_disconnect(self, sid: str) -> None:
@@ -106,6 +126,8 @@ class SystemNamespace(AuthedNamespace):
 
 class DockerNamespace(AuthedNamespace):
     """Periodic `docker:tick` snapshot + live `docker:event` stream."""
+
+    ALLOWED_ROLES = frozenset({"admin"})
 
 
 class ChecksNamespace(_RoomNamespace):

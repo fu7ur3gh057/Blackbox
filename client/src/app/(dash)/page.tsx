@@ -1,3 +1,5 @@
+"use client";
+
 import { Reveal } from "@/components/reveal";
 import { GaugeMeter } from "@/components/widgets/gauge-meter";
 import { HealthyList } from "@/components/widgets/healthy-list";
@@ -8,6 +10,8 @@ import { PixelGrid } from "@/components/widgets/pixel-grid";
 import { ServerLocation } from "@/components/widgets/server-location";
 import { Statistics } from "@/components/widgets/statistics";
 import { WatchCards } from "@/components/widgets/watch-cards";
+import { auth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * Smart layout — short and tall widgets pair up so the eye doesn't see
@@ -21,6 +25,9 @@ import { WatchCards } from "@/components/widgets/watch-cards";
  *   5. ServerLocation                                (full width)
  */
 export default function Dashboard() {
+  const me = useQuery({ queryKey: ["auth", "me"], queryFn: () => auth.me(), retry: false });
+  const isAdmin = me.data?.role === "admin";
+
   return (
     <div className="space-y-5">
       <Reveal delay={0}><Statistics /></Reveal>
@@ -42,7 +49,9 @@ export default function Dashboard() {
       </div>
 
       <Reveal delay={1200}><LogsTeaser /></Reveal>
-      <Reveal delay={1500}><WatchCards /></Reveal>
+      {/* Docker overview — admin-only because the underlying APIs are
+          gated by role (staff/viewer would see permanent loading state) */}
+      {isAdmin && <Reveal delay={1500}><WatchCards /></Reveal>}
       <Reveal delay={1800}><ServerLocation /></Reveal>
     </div>
   );

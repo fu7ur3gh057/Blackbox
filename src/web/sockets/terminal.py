@@ -126,6 +126,14 @@ class TerminalNamespace(AsyncNamespace):
             log.info("terminal: refusing %s — bad session token: %s", sid, e)
             return False
         web_user = session_claims.get("sub", "")
+        # Terminal is admin-only — even if the user's bb_session is
+        # valid, staff/viewer can't open a shell.
+        if session_claims.get("role") != "admin":
+            log.info(
+                "terminal: refusing %s — role %r is not admin (user=%s)",
+                sid, session_claims.get("role"), web_user,
+            )
+            return False
 
         # Step 2: terminal token — issued by POST /api/terminal/unlock
         # after PAM-authenticating a unix user/password. Must carry

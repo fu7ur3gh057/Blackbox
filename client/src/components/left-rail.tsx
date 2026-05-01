@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { Tip } from "@/components/ui/tooltip";
+import { auth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Activity,
@@ -17,18 +19,31 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV: { href: string; Icon: LucideIcon; label: string }[] = [
+interface NavItem {
+  href: string;
+  Icon: LucideIcon;
+  label: string;
+  /** When true, only role=admin sees this item. Staff / viewer get
+   * neither the icon nor the route. */
+  adminOnly?: boolean;
+}
+
+const NAV: NavItem[] = [
   { href: "/",         Icon: LayoutDashboard, label: "Overview" },
   { href: "/checks",   Icon: Activity,        label: "Checks" },
   { href: "/alerts",   Icon: Bell,            label: "Alerts" },
-  { href: "/docker",   Icon: Boxes,           label: "Docker" },
+  { href: "/docker",   Icon: Boxes,           label: "Docker",   adminOnly: true },
   { href: "/logs",     Icon: Terminal,        label: "Logs" },
-  { href: "/terminal", Icon: SquareTerminal,  label: "Terminal" },
-  { href: "/users",    Icon: UsersIcon,       label: "Users" },
+  { href: "/terminal", Icon: SquareTerminal,  label: "Terminal", adminOnly: true },
+  { href: "/users",    Icon: UsersIcon,       label: "Users",    adminOnly: true },
 ];
 
 export function LeftRail() {
   const pathname = usePathname();
+  const me = useQuery({ queryKey: ["auth", "me"], queryFn: () => auth.me(), retry: false });
+  const isAdmin = me.data?.role === "admin";
+  const visible = NAV.filter((item) => !item.adminOnly || isAdmin);
+
   return (
     <aside className="relative flex flex-col items-center py-5 gap-2 h-full">
       {/* logo — pure SVG, no PNG roundtrip and no basePath gotchas */}
@@ -38,7 +53,7 @@ export function LeftRail() {
         </Link>
       </Tip>
 
-      {NAV.map(({ href, Icon, label }) => {
+      {visible.map(({ href, Icon, label }) => {
         const active = href === "/" ? pathname === "/" : pathname?.startsWith(href);
         return (
           <Tip key={href} text={label} side="right">
